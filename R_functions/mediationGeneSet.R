@@ -1,10 +1,16 @@
 
-# Mediation Analysis for Gene Sets (in progress)
+# Mediation Analysis for Gene Sets 
 # Author: Max Segnitz, msegnitz@uw.edu
 # Started April 2020
 #
-
-# Contains two functions to run mediation analysis over a set of genes or modules. 
+# © Richard M Segnitz 2020
+# License: This software is licensed under GNU General Public License, and may
+# be modified and/or redistributed under GNU GPL version 3 or later. License details
+# can be found in the accompanying this script, or at  (http://www.gnu.org/licenses/).
+#
+# DESCRIPTION:
+# Contains two functions to run mediation analysis over a set of genes or gene modules
+# (or any set of mediatiors, for that matter). 
 #
 # mediationGeneSet() runs automated model fitting and mediation analysis over a set 
 #         of genes with a given outcome, model structure, and specified contrasts.
@@ -492,8 +498,9 @@ mediationGeneSet<- function(model.data,
 #'########################################
 
 ## This function comes from [https://stackoverflow.com/questions/41582486/how-to-convert-r-mediation-summary-to-data-frame ] 
-## and is not my own.
-## Original poster: hrbrmstr
+## and is not my own. It has been modified in the name of the function only.
+## Original Author: Stack Overflow user "hrbrmstr"
+## This material is covered in Creative Commons, 
 
 ### DEFINE FUNCTION ####
 
