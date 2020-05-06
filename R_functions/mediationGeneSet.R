@@ -9,14 +9,11 @@
 # can be found in the accompanying this script, or at  (http://www.gnu.org/licenses/).
 #
 # DESCRIPTION:
-# Contains two functions to run mediation analysis over a set of genes or gene modules
+# Contains function to run mediation analysis over a set of genes or gene modules
 # (or any set of mediatiors, for that matter). 
 #
 # mediationGeneSet() runs automated model fitting and mediation analysis over a set 
 #         of genes with a given outcome, model structure, and specified contrasts.
-#
-# extractMediationSummary() is required by mediationGeneSet() to extract mediation 
-#         summary in useful matrix format.
 #
 # The core function takes a number of inputs required to specify the desired input 
 # models for mediation analysis, run mediation analysis over the desired sets of 
@@ -91,7 +88,7 @@ mediationGeneSet<- function(model.data,
   set.seed(2828)
   
   # Extract mediation summary
-  source("https://github.com/rmsegnitz/Bioinformatics_Tools/tree/master/R_functions/extractMediationSummary.R")
+  source("https://raw.githubusercontent.com/rmsegnitz/Bioinformatics_Tools/master/R_functions/extractMediationSummary.R")
   
   # Data manipulation and figures
   library(tidyverse)
@@ -494,64 +491,6 @@ mediationGeneSet<- function(model.data,
                                   input.anovas=mediation.anovas)}
 }
 
-
-
-
-#'########################################
-####  2)  extractMediationSummary     ####
-#'########################################
-
-## This function comes from [https://stackoverflow.com/questions/41582486/how-to-convert-r-mediation-summary-to-data-frame ] 
-## and is not my own. It has been modified in the name of the function only.
-## Original Author: Stack Overflow user "hrbrmstr"
-## This material is covered in Creative Commons, 
-
-### DEFINE FUNCTION ####
-
-extractMediationSummary <- function (x) { 
-  
-  clp <- 100 * x$conf.level
-  isLinear.y <- ((class(x$model.y)[1] %in% c("lm", "rq")) || 
-                   (inherits(x$model.y, "glm") && x$model.y$family$family == 
-                      "gaussian" && x$model.y$family$link == "identity") || 
-                   (inherits(x$model.y, "survreg") && x$model.y$dist == 
-                      "gaussian"))
-  
-  printone <- !x$INT && isLinear.y
-  
-  if (printone) {
-    
-    smat <- c(x$d1, x$d1.ci, x$d1.p)
-    smat <- rbind(smat, c(x$z0, x$z0.ci, x$z0.p))
-    smat <- rbind(smat, c(x$tau.coef, x$tau.ci, x$tau.p))
-    smat <- rbind(smat, c(x$n0, x$n0.ci, x$n0.p))
-    
-    rownames(smat) <- c("ACME", "ADE", "Total Effect", "Prop. Mediated")
-    
-  } else {
-    smat <- c(x$d0, x$d0.ci, x$d0.p)
-    smat <- rbind(smat, c(x$d1, x$d1.ci, x$d1.p))
-    smat <- rbind(smat, c(x$z0, x$z0.ci, x$z0.p))
-    smat <- rbind(smat, c(x$z1, x$z1.ci, x$z1.p))
-    smat <- rbind(smat, c(x$tau.coef, x$tau.ci, x$tau.p))
-    smat <- rbind(smat, c(x$n0, x$n0.ci, x$n0.p))
-    smat <- rbind(smat, c(x$n1, x$n1.ci, x$n1.p))
-    smat <- rbind(smat, c(x$d.avg, x$d.avg.ci, x$d.avg.p))
-    smat <- rbind(smat, c(x$z.avg, x$z.avg.ci, x$z.avg.p))
-    smat <- rbind(smat, c(x$n.avg, x$n.avg.ci, x$n.avg.p))
-    
-    rownames(smat) <- c("ACME (control)", "ACME (treated)", 
-                        "ADE (control)", "ADE (treated)", "Total Effect", 
-                        "Prop. Mediated (control)", "Prop. Mediated (treated)", 
-                        "ACME (average)", "ADE (average)", "Prop. Mediated (average)")
-    
-  }
-  
-  colnames(smat) <- c("Estimate", paste(clp, "% CI Lower", sep = ""), 
-                      paste(clp, "% CI Upper", sep = ""), "p-value")
-  smat
-  
-}
 
 
 
