@@ -64,11 +64,6 @@
 #                    plot.dir = fig.dir)
 
 
-# Required custom dependencies
-
-# Extract mediation summary
-source("https://raw.githubusercontent.com/rmsegnitz/Bioinformatics_Tools/master/R_functions/extractMediationSummary.R")
-
 
 ########### DEFINE INPUTS ###############
 mediationGeneSet<- function(model.data,
@@ -90,6 +85,10 @@ mediationGeneSet<- function(model.data,
   
   ########## LOAD PACKAGES ############# 
   set.seed(2828)
+  
+  # Required custom dependencies
+  # Extract mediation summary
+  source("https://raw.githubusercontent.com/rmsegnitz/Bioinformatics_Tools/master/R_functions/extractMediationSummary.R")
   
 
   # Data manipulation and figures
