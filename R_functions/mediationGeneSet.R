@@ -435,10 +435,10 @@ mediationGeneSet<- function(model.data,
     dir.create(paste(out.dir, "mediation_output", sep="/"), showWarnings = FALSE)
     
     for(s in 1:length(mediation.summary.mat)){
-      write.csv(mediation.summary.mat[s],
-                     paste(paste(out.dir, "mediation_output", sep="/"), 
-                           gsub(" ","_",gsub("/","_", paste(names(mediation.summary[s]), 
-                                 ".csv", sep=""))), sep="/"))
+      write.csv(mediation.summary.mat[s], "temp.file.name.csv")
+                     # paste(paste(out.dir, "mediation_output", sep="/"), 
+                     #       gsub(" ","_",gsub("/","_", paste(names(mediation.summary[s]), 
+                     #             ".csv", sep=""))), sep="/"))
     }
     
  
