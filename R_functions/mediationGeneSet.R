@@ -89,6 +89,10 @@ mediationGeneSet<- function(model.data,
   
   ########## LOAD PACKAGES ############# 
   set.seed(2828)
+  
+  # Extract mediation summary
+  source("https://github.com/rmsegnitz/Bioinformatics_Tools/tree/master/R_functions/extractMediationSummary.R")
+  
   # Data manipulation and figures
   library(tidyverse)
   library(stringi)
