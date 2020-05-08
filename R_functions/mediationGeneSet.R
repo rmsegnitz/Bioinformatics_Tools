@@ -64,7 +64,8 @@
 #                    random = TRUE ,
 #                    random.effect = "PID",
 #                    plots=TRUE,
-#                    color.groups = NULL,
+#                    color.groups = c( "Placebo/Placebo" = "#2B2725","Placebo/SCIT" = "#EE9A00", 
+#                                       "AMG 157/Placebo" ="#3A5FCD", "AMG 157/SCIT" ="#FF0460"),
 #                    plot.dir = fig.dir)
 
 
@@ -217,8 +218,8 @@ if(!is.null(color.groups){if("Average" %in% names(color.groups) & "Total" %in% n
             geom_linerange(aes(y=Effect, xmin=`95% CI Lower`, xmax = `95% CI Upper`), lwd=1, position= position_dodge(width=1/2))+
             geom_pointrange(aes(y = Effect, x= Estimate, xmin=`95% CI Lower`, xmax = `95% CI Upper`), 
                             lwd = 1/2, position=position_dodge(width=1/2), shape=21)+
-            scale_color_colorblind()+
-            scale_fill_colorblind()+
+            scale_color_manual(values = plot.colors )+
+            scale_fill_manual(values = plot.colors )+
             ylab("")+
             xlim(x.axis.lims)+
             ggtitle(paste(outcome, "Mediation by", i, sep= " "))+
@@ -238,8 +239,8 @@ if(!is.null(color.groups){if("Average" %in% names(color.groups) & "Total" %in% n
             geom_linerange(aes(y=Effect, xmin=`95% CI Lower`, xmax = `95% CI Upper`), lwd=1, position= position_dodge(width=1/2))+
             geom_pointrange(aes(y = Effect, x= Estimate, xmin=`95% CI Lower`, xmax = `95% CI Upper`), 
                             lwd = 1/2, position=position_dodge(width=1/2), shape=21)+
-            scale_color_colorblind()+
-            scale_fill_colorblind()+
+            scale_color_manual(values = plot.colors )+
+            scale_fill_manual(values = plot.colors )+
             xlab("Proportion of Effect Mediated")+
             ylab("")+
             xlim(x.axis.lims)+
@@ -368,8 +369,8 @@ if(!is.null(color.groups){if("Average" %in% names(color.groups) & "Total" %in% n
               geom_linerange(aes(y=Effect, xmin=`95% CI Lower`, xmax = `95% CI Upper`), lwd=1, position= position_dodge(width=1/2))+
               geom_pointrange(aes(y = Effect, x= Estimate, xmin=`95% CI Lower`, xmax = `95% CI Upper`), 
                               lwd = 1/2, position=position_dodge(width=1/2), shape=21)+
-              scale_color_colorblind()+
-              scale_fill_colorblind()+
+              scale_color_manual(values = plot.colors)+
+              scale_fill_manual(values = plot.colors)+
               ylab("")+
               xlim(x.axis.lims)+
               ggtitle(paste(outcome, "Mediation by", i, sep= " "))+
@@ -389,8 +390,8 @@ if(!is.null(color.groups){if("Average" %in% names(color.groups) & "Total" %in% n
               geom_linerange(aes(y=Effect, xmin=`95% CI Lower`, xmax = `95% CI Upper`), lwd=1, position= position_dodge(width=1/2))+
               geom_pointrange(aes(y = Effect, x= Estimate, xmin=`95% CI Lower`, xmax = `95% CI Upper`), 
                               lwd = 1/2, position=position_dodge(width=1/2), shape=21)+
-              scale_color_colorblind()+
-              scale_fill_colorblind()+
+              scale_color_manual(values = plot.colors )+
+              scale_fill_manual(values = plot.colors )+
               xlab("Proportion of Effect Mediated")+
               ylab("")+
               xlim(x.axis.lims)+
