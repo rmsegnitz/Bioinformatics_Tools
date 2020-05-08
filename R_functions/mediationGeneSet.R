@@ -124,7 +124,7 @@ if(!is.null(color.groups) & !all(unlist(t.c.contrasts) %in% names(color.groups))
 
 if(is.null(color.groups)){plot.colors = c("#000000","#E69F00","#85C0F9","#601A4A")}
   
-if(!is.null(color.groups){if("Average" %in% names(color.groups) & "Total" %in% names(color.groups)){plot.colors<-color.groups} else 
+if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% names(color.groups)){plot.colors<-color.groups} else 
   if("Average" %in% names(color.groups)){plot.colors<- c(color.groups, c("Total" = "#601A4A"))} else if("Total" %in% names(color.groups)){
     plot.colors<- c(color.groups, c("Average" = "#85C0F9"))} else {plot.colors<- c(color.groups, c("Average" = "#85C0F9" , "Total" = "#601A4A"))}}
 
