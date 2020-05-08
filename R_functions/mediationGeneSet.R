@@ -196,7 +196,7 @@ mediationGeneSet<- function(model.data,
             dplyr::select(value)%>%
             range(na.rm = T)
           
-          # Plot the mdeiation coefficient comparisons
+          # Plot the mediation coefficient comparisons
           plot1<- plot_df%>%
             filter(effect.type=="Effect")%>%
             ggplot(aes(color=group, fill=group))+
