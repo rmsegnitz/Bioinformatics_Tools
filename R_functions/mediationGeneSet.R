@@ -43,6 +43,9 @@
 #  plot.dir = (character string) Filepath to directory where figures are to be saved (will create subdirectory witin this directory) 
 #  plot.height = (numeric) Height in inches of saved plot (deafaults to 4)
 #  plot.width = (numeric) Height in inches of saved plot (deafaults to 6)
+#  color.groups = (character) A named vector of plotting colors. Should include all the levels of the contrasts requested. Defaults to NULL, in which case
+#                  ("#000000","#E69F00","#85C0F9","#601A4A") is the default pallette. If you wish to override the color specification for "Average" or "Total"
+#                  they can be included in the vector of specified colors. 
 
 
 # EXAMPLE USAGE
@@ -61,6 +64,7 @@
 #                    random = TRUE ,
 #                    random.effect = "PID",
 #                    plots=TRUE,
+#                    color.groups = NULL,
 #                    plot.dir = fig.dir)
 
 
@@ -76,6 +80,7 @@ mediationGeneSet<- function(model.data,
                             save.output=FALSE,
                             out.dir,
                             plots=FALSE,
+                            color.groups = NULL,
                             plot.height = 4,
                             plot.width = 6,
                             save.plots = FALSE,
@@ -112,9 +117,17 @@ mediationGeneSet<- function(model.data,
   mediation.summary.mat<-list()
   mediation.plots<-list()
 
-# Load data
+ ##### SETUP PLOTTING AES #####
 
+if(!is.null(color.groups) & !all(unlist(t.c.contrasts) %in% names(color.groups))){print("WARNING: not all contrast levels present in plot colors provided.")}
+
+if(is.null(color.groups)){plot.colors = c("#000000","#E69F00","#85C0F9","#601A4A")}
   
+if(!is.null(color.groups){if("Average" %in% names(color.groups) & "Total" %in% names(color.groups)){plot.colors<-color.groups} else 
+  if("Average" %in% names(color.groups)){plot.colors<- c(color.groups, c("Total" = "#601A4A"))} else if("Total" %in% names(color.groups)){
+    plot.colors<- c(color.groups, c("Average" = "#85C0F9"))} else {plot.colors<- c(color.groups, c("Average" = "#85C0F9" , "Total" = "#601A4A"))}}
+
+
   
 ###########  RUN MEDIATION IF RANDOM = TRUE ####################
   if(random){
