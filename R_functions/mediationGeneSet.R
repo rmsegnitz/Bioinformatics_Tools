@@ -98,16 +98,19 @@ mediationGeneSet<- function(model.data,
   
 
   # Data manipulation and figures
-  library(tidyverse)
-  library(stringi)
-  library(stringr)
+  require(tidyverse, quitely = TRUE)
+  require(stringi, quitely = TRUE)
+  require(stringr, quitely = TRUE)
   # mediation analysis
-  library(mediation)
+  require(mediation, quitely = TRUE)
   # Progress tracking
-  library(svMisc)
+  require(svMisc, quitely = TRUE)
 
   # Plotting
-  if(plots){library(cowplot)}
+  if(plots){require(cowplot, quitely = TRUE)
+            require(DiagrammeR, quietly = TRUE)
+            require(DiagrammeRsvg, quietly = TRUE)
+            require(rsvg, quietly = TRUE)}
   
   
   ###### SETUP OUTPUT STORAGE ######
@@ -133,7 +136,7 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
 ###########  RUN MEDIATION IF RANDOM = TRUE ####################
   if(random){
     # load lme4 for random effects model fitting
-    library(lme4)
+    require(lme4, quitely = TRUE)
     
     # for each gene in list, construct formulas for component models.
     for(g in 1:length(gene.list)) { 
