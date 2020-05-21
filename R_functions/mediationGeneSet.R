@@ -49,7 +49,7 @@
 #  boot = (logical) Whether to generate CIs by non-parametric bootrapping. default is FALSE, which will produce CIs via quasi Bayesian approximation.
 #  boot.ci.type = (character) Which type of CIs to generate if boot=TRUE. Defaults to "perc" (percentile-based), but can be "bca"(bias-coorected & accellerated)
 #  sims = (numeric) Number of simulations to use when generating confidence intervals. Defaults to 1000. 
-
+# robustSE = (logical) Whether or not to use robust, heteroscedasticity consistent errors when usuing quasi-Bayesian estimation. Default = FALSE.
 
 # EXAMPLE USAGE
 # mediation.analysis<-
@@ -93,7 +93,8 @@ mediationGeneSet<- function(model.data,
                             random.effect,
                             boot=FALSE,
                             sims=1000,
-                            boot.ci.type="perc"
+                            boot.ci.type="perc",
+                            robustSE=FALSE
                             ){
 
   ########## LOAD PACKAGES ############# 
@@ -188,7 +189,7 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
         # run mediation analysis
         results = mediate(med.fit, out.fit, treat=treatment, mediator=i,
                           control.value = t.c.contrasts[[j]][2], 
-                          treat.value = t.c.contrasts[[j]][1], boot = boot, sims = sims, boot.ci.type = boot.ci.type)
+                          treat.value = t.c.contrasts[[j]][1], boot = boot, sims = sims, boot.ci.type = boot.ci.type, robustSE = robustSE)
         
         #######  PRODUCE MEDIATION PLOTS ###############
         
