@@ -93,7 +93,7 @@ mediationGeneSet<- function(model.data,
                             random.effect,
                             boot=FALSE,
                             sims=1000,
-                            boot.ci.type="perc",
+                            boot.ci.type="perc"
                             ){
 
   ########## LOAD PACKAGES ############# 
