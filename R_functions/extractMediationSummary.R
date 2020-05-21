@@ -22,7 +22,7 @@
 extractMediationSummary <- function (x) { 
   
   clp <- 100 * x$conf.level
-  isLinear.y <- ((class(x$model.y)[1] %in% c("lm", "rq")) || 
+  isLinear.y <- ((class(x$model.y)[1] %in% c("lm","lmerMod", "rq")) || 
                    (inherits(x$model.y, "glm") && x$model.y$family$family == 
                       "gaussian" && x$model.y$family$link == "identity") || 
                    (inherits(x$model.y, "survreg") && x$model.y$dist == 
