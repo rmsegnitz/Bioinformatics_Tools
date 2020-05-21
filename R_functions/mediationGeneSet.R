@@ -46,6 +46,9 @@
 #  color.groups = (character) A named vector of plotting colors. Should include all the levels of the contrasts requested. Defaults to NULL, in which case
 #                  ("#000000","#E69F00","#85C0F9","#601A4A") is the default pallette. If you wish to override the color specification for "Average" or "Total"
 #                  they can be included in the vector of specified colors. 
+#  boot = (logical) Whether to generate CIs by non-parametric bootrapping. default is FALSE, which will produce CIs via quasi Bayesian approximation.
+#  boot.ci.type = (character) Which type of CIs to generate if boot=TRUE. Defaults to "perc" (percentile-based), but can be "bca"(bias-coorected & accellerated)
+#  sims = (numeric) Number of simulations to use when generating confidence intervals. Defaults to 1000. 
 
 
 # EXAMPLE USAGE
@@ -87,8 +90,12 @@ mediationGeneSet<- function(model.data,
                             save.plots = FALSE,
                             plot.dir,
                             random=FALSE,
-                            random.effect){
-  
+                            random.effect,
+                            boot=FALSE,
+                            sims=1000,
+                            boot.ci.type="perc",
+                            ){
+
   ########## LOAD PACKAGES ############# 
   set.seed(2828)
   
@@ -181,7 +188,7 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
         # run mediation analysis
         results = mediate(med.fit, out.fit, treat=treatment, mediator=i,
                           control.value = t.c.contrasts[[j]][2], 
-                          treat.value = t.c.contrasts[[j]][1])
+                          treat.value = t.c.contrasts[[j]][1], boot = boot, sims = sims, boot.ci.type = boot.ci.type)
         
         #######  PRODUCE MEDIATION PLOTS ###############
         
@@ -332,7 +339,7 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
         # Run mediation analysis.
         results = mediate(med.fit, out.fit, treat=treatment, mediator=i,
                           control.value = t.c.contrasts[[j]][2], 
-                          treat.value = t.c.contrasts[[j]][1])
+                          treat.value = t.c.contrasts[[j]][1], boot = boot, sims = sims, boot.ci.type = boot.ci.type)
         
         #######  PRODUCE MEDIATION PLOTS ###############
         
