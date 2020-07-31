@@ -168,7 +168,7 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
         paste(paste(outcome, "~", sep=" "),
               paste(i, treatment, sep="*"),"+", 
               paste(covariates, collapse=" + "),"+" , 
-              paste("(1|",random.effect , ")", sep=""), sep=" "))} else{ # else no interaction if not specified.
+              paste("(1|",random.effect , ")", sep=""), sep=" "))}} else{ # else no interaction if not specified.
                 if(is.null(covariates)){out.formula<-as.formula(
                   paste(paste(outcome, "~", sep=" "),
                         i,"+", treatment,"+" , 
