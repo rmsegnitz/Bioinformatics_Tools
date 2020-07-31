@@ -163,7 +163,7 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
       if(is.null(covariates)){      out.formula<-as.formula(
         paste(paste(outcome, "~", sep=" "),
               paste(i, treatment, sep="*"),"+" , 
-              paste("(1|",random.effect , ")", sep=""), sep=" "))}else {  
+              paste("(1|",random.effect , ")", sep=""), sep=" "))}else {
       out.formula<-as.formula(
         paste(paste(outcome, "~", sep=" "),
               paste(i, treatment, sep="*"),"+", 
