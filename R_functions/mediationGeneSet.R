@@ -185,6 +185,7 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
       # Fit outcome (dependent variable) model
       out.fit<-lmer(out.formula, model.data)
       
+      # Save input model output
       mediation.models[[paste(i,"mediator",sep="_")]]<-summary(med.fit)
       mediation.models[[paste(i,"outcome",sep="_")]]<-summary(out.fit)
       
@@ -346,6 +347,10 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
       # Fit outcome (dependent variable) model
       out.fit<-lm(out.formula, model.data)
       
+      # Save input model output
+      mediation.models[[paste(i,"mediator",sep="_")]]<-summary(med.fit)
+      mediation.models[[paste(i,"outcome",sep="_")]]<-summary(out.fit)
+
       mediation.anovas[[paste(i,"mediator_Anova",sep="_")]]<-car::Anova(med.fit)
       mediation.anovas[[paste(i,"outcome_Anova",sep="_")]]<-car::Anova(out.fit)
       
