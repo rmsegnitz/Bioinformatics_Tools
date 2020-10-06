@@ -511,10 +511,12 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
   if(plots){list(output=mediation.output,
                  summary=mediation.summary.mat,
                  input.anovas=mediation.anovas,
-                 plots=mediation.plots)}else{
+                 plots=mediation.plots, 
+                 contrasts = t.c.contrasts)}else{
                           list(output=mediation.output,
-                                summary=mediation.summary.mat,
-                                  input.anovas=mediation.anovas)}
+                               summary=mediation.summary.mat,
+                               input.anovas=mediation.anovas, 
+                               contrasts = t.c.contrasts)}
 }
 
 
