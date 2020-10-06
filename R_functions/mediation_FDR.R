@@ -211,7 +211,7 @@ mediationFDRcorrect = function(
 # FDR_corrected_output = (data.frame) A dataframe output from mediationFDRcorrect()
 # mediator = (character) A mediator present in "FDR_corrected_output", for which a reformatted table is desired. 
 
-FDRcorrectedTable()<- function(FDR_corrected_output, mediator_of_interest){
+FDRcorrectedTable<- function(FDR_corrected_output, mediator_of_interest){
   
   # Subset dataframe to mediator of interest
   df_mediator<- FDR_corrected_output%>%dplyr::filter(mediator == mediator_of_interest)
