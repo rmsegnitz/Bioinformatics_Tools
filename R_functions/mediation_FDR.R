@@ -1,9 +1,49 @@
 
+# FDR Correction for Geneset Mediation 
+# Author: Max Segnitz, msegnitz@uw.edu
+# Started October 2020
+#
+# © Richard M Segnitz 2020
+# License: This software is licensed under GNU General Public License, and may
+# be modified and/or redistributed under GNU GPL version 3 or later. License details
+# can be found in the accompanying this script, or at  (http://www.gnu.org/licenses/).
+#
+# DESCRIPTION:
+# Contains function to aggregate output from mediationGeneSet() function, and FDR correct the associated p-values.
+
+# The core function takes as it's input the output from mediationGeneSet() and returns an aggregated list of all 
+# results by mediator including adjusted p-values.
+
+# NOTE: P value correction is by default run on each contrast separately (ie. only  corrected within contrast)
 
 
-mediationFDRcorrect = function(mediation_output, method = "BH"){
+##################################
+## 1) mediationFDRcorrect()   ####
+##################################
+
+# REQUIRED
+#  mediation_output = (list) Output from mediationGeneSet()
+
+# OPTIONAL
+#  method_fdr = (character) Method passed to p.adjust() when running FDR correction.
+
+########### DEFINE INPUTS ###############
+
+mediationFDRcorrect = function(
+  mediation_output, 
+  method_fdr = "BH"){
   
-  # Assign specified contrasts contrasts
+  ########## LOAD PACKAGES ############# 
+  set.seed(2828)
+  
+  # Data manipulation and figures
+  require(tidyverse, quietly = TRUE)
+  require(stringi, quietly = TRUE)
+  require(stringr, quietly = TRUE)
+
+  ########## RUN FUNCTION ############# 
+  
+  # Assign specified contrasts 
   mediation.contrasts <-mediation_output$contrasts
   
   #-----------------------------------------------------
@@ -89,19 +129,19 @@ mediationFDRcorrect = function(mediation_output, method = "BH"){
   summaries_bound_adjusted<-
     summaries_bound%>%
     group_by(contrast)%>%
-    mutate(`ACME (average)_p-value_adjusted` = p.adjust(`ACME (average)_p-value`, method = "BH"))%>%
-    mutate(`ACME (control)_p-value_adjusted` = p.adjust(`ACME (control)_p-value`, method = "BH"))%>%
-    mutate(`ACME (treated)_p-value_adjusted` = p.adjust(`ACME (treated)_p-value`, method = "BH"))%>%
-    mutate(`ADE (average)_p-value_adjusted` = p.adjust(`ADE (average)_p-value`, method = "BH"))%>%
-    mutate(`ADE (control)_p-value_adjusted` = p.adjust(`ADE (control)_p-value`, method = "BH"))%>%
-    mutate(`ADE (treated)_p-value_adjusted` = p.adjust(`ADE (treated)_p-value`, method = "BH"))%>%
-    mutate(`Prop. Mediated (average)_p-value_adjusted` = p.adjust(`Prop. Mediated (control)_p-value`,
-                                                                  method = "BH"))%>%
-    mutate(`Prop. Mediated (control)_p-value_adjusted` = p.adjust(`Prop. Mediated (control)_p-value`, 
-                                                                  method = "BH"))%>%
-    mutate(`Prop. Mediated (treated)_p-value_adjusted` = p.adjust(`Prop. Mediated (treated)_p-value`, 
-                                                                  method = "BH"))%>%
-    mutate(`Total Effect_p-value_adjusted` = p.adjust(`Total Effect_p-value`, method = "BH"))%>%
+    mutate(`ACME (average)_p-value.adjusted` = p.adjust(`ACME (average)_p-value`, method = method_fdr))%>%
+    mutate(`ACME (control)_p-value.adjusted` = p.adjust(`ACME (control)_p-value`, method = method_fdr))%>%
+    mutate(`ACME (treated)_p-value.adjusted` = p.adjust(`ACME (treated)_p-value`, method = method_fdr))%>%
+    mutate(`ADE (average)_p-value.adjusted` = p.adjust(`ADE (average)_p-value`, method = method_fdr))%>%
+    mutate(`ADE (control)_p-value.adjusted` = p.adjust(`ADE (control)_p-value`, method = method_fdr))%>%
+    mutate(`ADE (treated)_p-value.adjusted` = p.adjust(`ADE (treated)_p-value`, method = method_fdr))%>%
+    mutate(`Prop. Mediated (average)_p-value.adjusted` = p.adjust(`Prop. Mediated (control)_p-value`,
+                                                                  method = method_fdr))%>%
+    mutate(`Prop. Mediated (control)_p-value.adjusted` = p.adjust(`Prop. Mediated (control)_p-value`, 
+                                                                  method = method_fdr))%>%
+    mutate(`Prop. Mediated (treated)_p-value.adjusted` = p.adjust(`Prop. Mediated (treated)_p-value`, 
+                                                                  method = method_fdr))%>%
+    mutate(`Total Effect_p-value.adjusted` = p.adjust(`Total Effect_p-value`, method = method_fdr))%>%
     
     # reorder dataframe
     dplyr::select(
@@ -109,43 +149,43 @@ mediationFDRcorrect = function(mediation_output, method = "BH"){
       
       'ACME (average)_95% CI Lower', 'ACME (average)_95% CI Upper', 'ACME (average)_Estimate', 
       
-      'ACME (average)_p-value', 'ACME (average)_p-value_adjusted', 
+      'ACME (average)_p-value', 'ACME (average)_p-value.adjusted', 
       
       'ACME (control)_95% CI Lower', 'ACME (control)_95% CI Upper', 'ACME (control)_Estimate', 
       
-      'ACME (control)_p-value', 'ACME (control)_p-value_adjusted', 
+      'ACME (control)_p-value', 'ACME (control)_p-value.adjusted', 
       
       'ACME (treated)_95% CI Lower', 'ACME (treated)_95% CI Upper', 'ACME (treated)_Estimate', 
       
-      'ACME (treated)_p-value', 'ACME (treated)_p-value_adjusted', 
+      'ACME (treated)_p-value', 'ACME (treated)_p-value.adjusted', 
       
       'ADE (average)_95% CI Lower', 'ADE (average)_95% CI Upper', 'ADE (average)_Estimate', 
       
-      'ADE (average)_p-value', 'ADE (average)_p-value_adjusted', 
+      'ADE (average)_p-value', 'ADE (average)_p-value.adjusted', 
       
       'ADE (control)_95% CI Lower', 'ADE (control)_95% CI Upper', 'ADE (control)_Estimate', 
       
-      'ADE (control)_p-value', 'ADE (control)_p-value_adjusted', 
+      'ADE (control)_p-value', 'ADE (control)_p-value.adjusted', 
       
       'ADE (treated)_95% CI Lower', 'ADE (treated)_95% CI Upper', 'ADE (treated)_Estimate', 
       
-      'ADE (treated)_p-value', 'ADE (treated)_p-value_adjusted', 
+      'ADE (treated)_p-value', 'ADE (treated)_p-value.adjusted', 
       
       'Prop. Mediated (average)_95% CI Lower', 'Prop. Mediated (average)_95% CI Upper', 'Prop. Mediated (average)_Estimate', 
       
-      'Prop. Mediated (average)_p-value', 'Prop. Mediated (average)_p-value_adjusted', 
+      'Prop. Mediated (average)_p-value', 'Prop. Mediated (average)_p-value.adjusted', 
       
       'Prop. Mediated (control)_95% CI Lower', 'Prop. Mediated (control)_95% CI Upper', 'Prop. Mediated (control)_Estimate', 
       
-      'Prop. Mediated (control)_p-value', 'Prop. Mediated (control)_p-value_adjusted', 
+      'Prop. Mediated (control)_p-value', 'Prop. Mediated (control)_p-value.adjusted', 
       
       'Prop. Mediated (treated)_95% CI Lower', 'Prop. Mediated (treated)_95% CI Upper', 'Prop. Mediated (treated)_Estimate', 
       
-      'Prop. Mediated (treated)_p-value', 'Prop. Mediated (treated)_p-value_adjusted', 
+      'Prop. Mediated (treated)_p-value', 'Prop. Mediated (treated)_p-value.adjusted', 
       
       'Total Effect_95% CI Lower', 'Total Effect_95% CI Upper', 'Total Effect_Estimate', 
       
-      'Total Effect_p-value', 'Total Effect_p-value_adjusted'
+      'Total Effect_p-value', 'Total Effect_p-value.adjusted'
       
     )
   
@@ -158,3 +198,32 @@ mediationFDRcorrect = function(mediation_output, method = "BH"){
   list(FDR_corrected_output=summaries_bound_adjusted)
    
 }
+
+
+##################################
+## 2) FDRcorrectedTable()   #####
+##################################
+
+# DESCRIPTION:
+# Function receives dataframe output from mediationFDRcorrect() and a mediator of interest, and outputs reformatted (publication friendly) tables. 
+
+# REQUIRED
+# FDR_corrected_output = (data.frame) A dataframe output from mediationFDRcorrect()
+# mediator = (character) A mediator present in "FDR_corrected_output", for which a reformatted table is desired. 
+
+FDRcorrectedTable()<- function(FDR_corrected_output, mediator_of_interest){
+  
+  # Subset dataframe to mediator of interest
+  df_mediator<- FDR_corrected_output%>%dplyr::filter(mediator == mediator_of_interest)
+  
+  # Create list to save tables
+  tables_formatted<-list()
+  
+  for(i in unique(df_mediator)$contrast){
+    tables_formatted[[i]]<-df_mediator%>%dplyr::filter(contrast == i)%>%
+      reshape2::melt(measure.vars = colnames(df_mediator)[-c(1,2)])%>%
+      separate(variable, c("variable", "measure", sep = "_"), remove=TRUE)
+  }
+  
+}
+
