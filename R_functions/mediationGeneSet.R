@@ -78,7 +78,7 @@ mediationGeneSet<- function(model.data,
                             gene.list,
                             outcome,
                             treatment,
-                            covariates,
+                            covariates=NULL,
                             interaction = FALSE,
                             t.c.contrasts,
                             save.output=FALSE,
@@ -151,23 +151,33 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
       progress(g, length(gene.list))
       i<-gene.list[g]
       # Specify formula for mediator model
-      med.formula<-as.formula(
-        paste(i, "~",treatment,"+",paste(covariates, collapse=" + "), "+", paste("(1|",random.effect , ")", sep=""), sep=" "))
+      if(is.null(covariates)){ med.formula<-as.formula(
+        paste(i, "~",treatment, "+", paste("(1|",random.effect , ")", sep=""), sep=" "))
+        } else {med.formula<-as.formula(
+        paste(i, "~",treatment,"+",paste(covariates, collapse=" + "), "+", paste("(1|",random.effect , ")", sep=""), sep=" "))}
       
       # specify interaction if indicated.
       if(interaction){
 
       # specify formula for outcome model
+      if(is.null(covariates)){      out.formula<-as.formula(
+        paste(paste(outcome, "~", sep=" "),
+              paste(i, treatment, sep="*"),"+" , 
+              paste("(1|",random.effect , ")", sep=""), sep=" "))}else {
       out.formula<-as.formula(
         paste(paste(outcome, "~", sep=" "),
               paste(i, treatment, sep="*"),"+", 
               paste(covariates, collapse=" + "),"+" , 
-              paste("(1|",random.effect , ")", sep=""), sep=" "))} else{ # else no interaction if not specified.
-        out.formula<-as.formula(
+              paste("(1|",random.effect , ")", sep=""), sep=" "))}} else{ # else no interaction if not specified.
+                if(is.null(covariates)){out.formula<-as.formula(
+                  paste(paste(outcome, "~", sep=" "),
+                        i,"+", treatment,"+" , 
+                        paste("(1|",random.effect , ")", sep=""), sep=" "))}else{  
+                  out.formula<-as.formula(
                   paste(paste(outcome, "~", sep=" "),
                         i,"+", treatment, "+",
                         paste(covariates, collapse=" + "),"+" , 
-                        paste("(1|",random.effect , ")", sep=""), sep=" "))}
+                        paste("(1|",random.effect , ")", sep=""), sep=" "))}}
       
       # Fit mediator model
       med.fit<-lmer( med.formula, model.data)
@@ -175,6 +185,7 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
       # Fit outcome (dependent variable) model
       out.fit<-lmer(out.formula, model.data)
       
+      # Save input model output
       mediation.models[[paste(i,"mediator",sep="_")]]<-summary(med.fit)
       mediation.models[[paste(i,"outcome",sep="_")]]<-summary(out.fit)
       
@@ -305,24 +316,30 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
       i<-gene.list[g]
       
       # Specify formula for mediator model
-      med.formula<-as.formula(
-        paste(i, "~", treatment,"+",paste(covariates, collapse=" + "), sep=" "))
+      
+      if(is.null(covariates)){med.formula<-as.formula(
+        paste(i, "~", treatment, sep=" "))} else{med.formula<-as.formula(
+        paste(i, "~", treatment,"+",paste(covariates, collapse=" + "), sep=" "))}
       
       # specify interaction if indicated.
       if(interaction){
         # specify formula for outcome model
-        out.formula<-as.formula(
+        if(is.null(covariates)){out.formula<-as.formula(
+          paste(paste(outcome, "~", sep=" "),
+                paste(i, treatment, sep="*"), sep=" "))} else {out.formula<-as.formula(
           paste(paste(outcome, "~", sep=" "),
                 paste(i, treatment, sep="*"),"+", 
-                paste(covariates, collapse=" + "), sep=" "))} else {
+                paste(covariates, collapse=" + "), sep=" "))}} else {
       
       # Specify behavior if interaction = FALSE
 
-        out.formula<-as.formula(
+        if(is.null(covariates)){out.formula<-as.formula(
+          paste(paste(outcome, "~", sep=" "),
+                i,"+", treatment, sep=" "))} else {out.formula<-as.formula(
           paste(paste(outcome, "~", sep=" "),
                 i,"+", treatment, "+",
                 paste(covariates, collapse=" + "), sep=" "))
-      }
+      }}
       
       # Fit mediator model
       med.fit<-lm(med.formula, model.data)
@@ -330,6 +347,10 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
       # Fit outcome (dependent variable) model
       out.fit<-lm(out.formula, model.data)
       
+      # Save input model output
+      mediation.models[[paste(i,"mediator",sep="_")]]<-summary(med.fit)
+      mediation.models[[paste(i,"outcome",sep="_")]]<-summary(out.fit)
+
       mediation.anovas[[paste(i,"mediator_Anova",sep="_")]]<-car::Anova(med.fit)
       mediation.anovas[[paste(i,"outcome_Anova",sep="_")]]<-car::Anova(out.fit)
       
