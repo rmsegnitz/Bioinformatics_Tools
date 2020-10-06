@@ -195,8 +195,8 @@ mediationFDRcorrect = function(
 ##       RETURN OUTPUT
 ##---------------------------
   
-  list(FDR_corrected_output=summaries_bound_adjusted)
-   
+  #list(FDR_corrected_output=summaries_bound_adjusted)
+  FDR_corrected_output=summaries_bound_adjusted
 }
 
 
@@ -211,19 +211,19 @@ mediationFDRcorrect = function(
 # FDR_corrected_output = (data.frame) A dataframe output from mediationFDRcorrect()
 # mediator = (character) A mediator present in "FDR_corrected_output", for which a reformatted table is desired. 
 
-# FDRcorrectedTable = function(FDR_corrected_output, mediator_of_interest){
-#   
-#   # Subset dataframe to mediator of interest
-#   df_mediator<- FDR_corrected_output%>%dplyr::filter(mediator == mediator_of_interest)
-#   
-#   # Create list to save tables
-#   tables_formatted<-list()
-#   
-#   for(i in unique(df_mediator)$contrast){
-#     tables_formatted[[i]]<-df_mediator%>%dplyr::filter(contrast == i)%>%
-#       reshape2::melt(measure.vars = colnames(df_mediator)[-c(1,2)])%>%
-#       separate(variable, c("variable", "measure", sep = "_"), remove=TRUE)
-#   }
-#   
-# }
+FDRcorrectedTable = function(FDR_corrected_output, mediator_of_interest){
+
+  # Subset dataframe to mediator of interest
+  df_mediator<- FDR_corrected_output%>%dplyr::filter(mediator == mediator_of_interest)
+
+  # Create list to save tables
+  tables_formatted<-list()
+
+  for(i in unique(df_mediator)$contrast){
+    tables_formatted[[i]]<-df_mediator%>%dplyr::filter(contrast == i)%>%
+      reshape2::melt(measure.vars = colnames(df_mediator)[-c(1,2)])%>%
+      separate(variable, c("variable", "measure", sep = "_"), remove=TRUE)
+  }
+
+}
 
