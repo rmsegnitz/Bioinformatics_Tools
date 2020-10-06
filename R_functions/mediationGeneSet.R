@@ -10,7 +10,7 @@
 #
 # DESCRIPTION:
 # Contains function to run mediation analysis over a set of genes or gene modules
-# (or any set of mediatiors, for that matter). 
+# (or any set of mediators, for that matter). 
 #
 # mediationGeneSet() runs automated model fitting and mediation analysis over a set 
 #         of genes with a given outcome, model structure, and specified contrasts.
