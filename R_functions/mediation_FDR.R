@@ -3,74 +3,91 @@
 
 mediation_FDR_correct = function(mediation_output, method = "BH"){
   
+  # Assign specified contrasts contrasts
   mediation.contrasts <-mediation_output$contrasts
   
-  # get contrast names in df named format
+  #-----------------------------------------------------
+  # GET CONTRAST NAMES IN DF FORMAT AND LIST OUTPUT DFS
+  #-----------------------------------------------------
+  
+  # Set up lists to store elements
   contrast_names<-list()
+  contrast_output_dfs<-list()
+  contrast_output_dfs_mediators<- list()
+  output_dfs_contrasts<-list()
   
+  # Pull formatted contrast names and the output dataframes they correspond to
   for(i in 1:length(mediation.contrasts)){
+    # formatted names
     contrast_names[i]<-paste("_T-", mediation.contrasts[[i]][1], "_C-", mediation.contrasts[[i]][2], sep = "")
-  }
+    # corresponding output dataframes
+    contrast_output_dfs[[i]]<-names(mediation_output$summary)[which(grepl(contrast_names[i], names(mediation_output$summary)))]
+    # mediators for each output
+    contrast_output_dfs_mediators[[i]]<-
+      unlist(lapply(contrast_output_dfs[[i]], function(x){str_split(x, "_")[[1]][1]}))
+    # assign output names to mediators
+    names(contrast_output_dfs_mediators[[i]])<-contrast_output_dfs[[i]]
+    
+    # List contrast for each df list (should be indentical)
+    output_dfs_contrasts[[i]]<-rep(contrast_names[i], length(contrast_output_dfs[[i]]))
+    # Assign names
+    names(output_dfs_contrasts[[i]])<-contrast_output_dfs[[i]]
+    
+    }
   
+  # Concanenate lists
+  contrast_output_dfs_mediators_all<-unlist(contrast_output_dfs_mediators)
+  output_dfs_contrasts_all<-unlist(output_dfs_contrasts)
   
-  # list dfs for each contrast
-  contrst1_df_list<-
-    names(mediation.analysis.mod2N$summary)[which(grepl(contrast1, names(mediation.analysis.mod2N$summary)))]
-  
-  contrst2_df_list<-
-    names(mediation.analysis.mod2N$summary)[which(grepl(contrast2, names(mediation.analysis.mod2N$summary)))]
-  
-  # List genes for each df list (should be indentical)
-  contrst1_df_list_genes<-
-    unlist(lapply(contrst1_df_list, function(x){str_split(x, "_")[[1]][1]}))
-  contrst2_df_list_genes<-
-    unlist(lapply(contrst2_df_list, function(x){str_split(x, "_")[[1]][1]}))
-  
-  # Assign names to genes
-  names(contrst1_df_list_genes)<-contrst1_df_list
-  names(contrst2_df_list_genes)<-contrst2_df_list
-  
-  # concatenate lists
-  contrst_df_list_genes<-c(contrst1_df_list_genes, contrst2_df_list_genes)
-  
-  # List contrast for each df list (should be indentical)
-  contrst1_df_list_contrast<-rep(contrast1, length(contrst1_df_list))
-  contrst2_df_list_contrast<-rep(contrast2, length(contrst2_df_list))
-  
-  # Assign names to genes
-  names(contrst1_df_list_contrast)<-contrst1_df_list
-  names(contrst2_df_list_contrast)<-contrst2_df_list
-  
-  # concatenate lists
-  contrast_df_list_contrast<-c(contrst1_df_list_contrast, contrst2_df_list_contrast)
+  ##----------------------------------------##
+  ##     RESHAPE AND AGGREGATE OUPUT      
+  ##----------------------------------------##
   
   ## convert summaries to wide format
-  summaries_transformed.mod2N<-
-    lapply(mediation.analysis.mod2N$summary, summary_to_wide)
+  summaries_transformed<-
+    lapply(mediation_output$summary, 
+      
+      function(x){
+      # Pull the dataframe name 
+      df.name <- deparse(substitute(x)) 
+      # Isolate contrast name
+      contrast_name<- unlist(lapply(strsplit(df.name, '`', fixed = TRUE), '[', 2))
+      # Isolate mediator name
+      mediator_name<- unlist(str_split(contrast_name, "_"))[1]
+      # Coerce df to widest format
+      x%>%    
+        as.data.frame()%>%
+        rownames_to_column("Effect")%>%
+        mutate(mediator = mediator_name)%>% # This doesn't currently work
+        reshape2::melt(measure.vars = c("Estimate", "95% CI Lower", "95% CI Upper", "p-value"))%>%
+        unite("Effect_Measure", c(Effect, variable))%>%
+        spread(key = "Effect_Measure", value = "value")
+    })
   
   # Assign gene names into each wide summary
-  for(i in names(summaries_transformed.mod2N)){
-    summaries_transformed.mod2N[[i]]$gene<-contrst_df_list_genes[[i]]
+  for(i in names(summaries_transformed)){
+    summaries_transformed[[i]]$mediator<-contrast_output_dfs_mediators_all[[i]]
   }
   
   # Assign contrast names into each wide summary
-  for(i in names(summaries_transformed.mod2N)){
-    summaries_transformed.mod2N[[i]]$contrast <- contrast_df_list_contrast[[i]]
+  for(i in names(summaries_transformed)){
+    summaries_transformed[[i]]$contrast <- str_sub(output_dfs_contrasts_all[[i]], 2)
   }
   
+  
   # Bind summaries
-  summaries_transformed.mod2N_all<-
-    summaries_transformed.mod2N%>%
+  summaries_bound<-
+    summaries_transformed%>%
     bind_rows()%>%
-    dplyr::select(gene, contrast, everything())
+    dplyr::select(mediator, contrast, everything())
   
   
-  ## Run FDR correction over p-values
-  colnames(summaries_transformed.mod2N_all)[grepl(x = colnames(summaries_transformed.mod2N_all), pattern = "p-value")]
+##----------------------------------------------##
+##             ADJUST P VALUES
+##----------------------------------------------##
   
-  
-  summaries_transformed.mod2N_all_FDR<-
-    summaries_transformed.mod2N_all%>%
+  summaries_bound_adjusted<-
+    summaries_bound%>%
     group_by(contrast)%>%
     mutate(`ACME (average)_p-value_adjusted` = p.adjust(`ACME (average)_p-value`, method = "BH"))%>%
     mutate(`ACME (control)_p-value_adjusted` = p.adjust(`ACME (control)_p-value`, method = "BH"))%>%
@@ -84,8 +101,53 @@ mediation_FDR_correct = function(mediation_output, method = "BH"){
                                                                   method = "BH"))%>%
     mutate(`Prop. Mediated (treated)_p-value_adjusted` = p.adjust(`Prop. Mediated (treated)_p-value`, 
                                                                   method = "BH"))%>%
-    mutate(`Total Effect_p-value_adjusted` = p.adjust(`Total Effect_p-value`, method = "BH"))
+    mutate(`Total Effect_p-value_adjusted` = p.adjust(`Total Effect_p-value`, method = "BH"))%>%
+    
+    # reorder dataframe
+    dplyr::select(
+      'mediator', 'contrast', 
+      
+      'ACME (average)_95% CI Lower', 'ACME (average)_95% CI Upper', 'ACME (average)_Estimate', 
+      
+      'ACME (average)_p-value', 'ACME (average)_p-value_adjusted', 
+      
+      'ACME (control)_95% CI Lower', 'ACME (control)_95% CI Upper', 'ACME (control)_Estimate', 
+      
+      'ACME (control)_p-value', 'ACME (control)_p-value_adjusted', 
+      
+      'ACME (treated)_95% CI Lower', 'ACME (treated)_95% CI Upper', 'ACME (treated)_Estimate', 
+      
+      'ACME (treated)_p-value', 'ACME (treated)_p-value_adjusted', 
+      
+      'ADE (average)_95% CI Lower', 'ADE (average)_95% CI Upper', 'ADE (average)_Estimate', 
+      
+      'ADE (average)_p-value', 'ADE (average)_p-value_adjusted', 
+      
+      'ADE (control)_95% CI Lower', 'ADE (control)_95% CI Upper', 'ADE (control)_Estimate', 
+      
+      'ADE (control)_p-value', 'ADE (control)_p-value_adjusted', 
+      
+      'ADE (treated)_95% CI Lower', 'ADE (treated)_95% CI Upper', 'ADE (treated)_Estimate', 
+      
+      'ADE (treated)_p-value', 'ADE (treated)_p-value_adjusted', 
+      
+      'Prop. Mediated (average)_95% CI Lower', 'Prop. Mediated (average)_95% CI Upper', 'Prop. Mediated (average)_Estimate', 
+      
+      'Prop. Mediated (average)_p-value', 'Prop. Mediated (average)_p-value_adjusted', 
+      
+      'Prop. Mediated (control)_95% CI Lower', 'Prop. Mediated (control)_95% CI Upper', 'Prop. Mediated (control)_Estimate', 
+      
+      'Prop. Mediated (control)_p-value', 'Prop. Mediated (control)_p-value_adjusted', 
+      
+      'Prop. Mediated (treated)_95% CI Lower', 'Prop. Mediated (treated)_95% CI Upper', 'Prop. Mediated (treated)_Estimate', 
+      
+      'Prop. Mediated (treated)_p-value', 'Prop. Mediated (treated)_p-value_adjusted', 
+      
+      'Total Effect_95% CI Lower', 'Total Effect_95% CI Upper', 'Total Effect_Estimate', 
+      
+      'Total Effect_p-value', 'Total Effect_p-value_adjusted'
+      
+    )
   
-  
-  
+   
 }
