@@ -1,7 +1,7 @@
 
 
 
-mediation_FDR_correct = function(mediation_output, method = "BH"){
+mediationFDRcorrect = function(mediation_output, method = "BH"){
   
   # Assign specified contrasts contrasts
   mediation.contrasts <-mediation_output$contrasts
