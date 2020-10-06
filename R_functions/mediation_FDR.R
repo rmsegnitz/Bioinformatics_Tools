@@ -149,5 +149,12 @@ mediationFDRcorrect = function(mediation_output, method = "BH"){
       
     )
   
+  
+  
+##---------------------------
+##       RETURN OUTPUT
+##---------------------------
+  
+  list(FDR_corrected_output=summaries_bound_adjusted)
    
 }
