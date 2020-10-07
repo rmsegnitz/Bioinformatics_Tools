@@ -225,7 +225,13 @@ FDRcorrectedTable = function(FDR_corrected_output, mediator_of_interest){
       tidyr::separate(variable, c("variable", "measure"),sep = "_", remove=TRUE)%>%
       spread(key = "measure", value = "value")
   }
-
   
+  ##---------------------------
+  ##       RETURN OUTPUT
+  ##---------------------------
+  
+  tables_formatted
+  
+
 }
 
