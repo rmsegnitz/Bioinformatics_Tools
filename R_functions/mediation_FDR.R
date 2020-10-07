@@ -195,7 +195,7 @@ mediationFDRcorrect = function(
 ##       RETURN OUTPUT
 ##---------------------------
   
-  list(FDR_corrected_output=summaries_bound_adjusted)
+summaries_bound_adjusted
   
 }
 
@@ -214,7 +214,7 @@ mediationFDRcorrect = function(
 FDRcorrectedTable = function(FDR_corrected_output, mediator_of_interest){
 
   # Subset dataframe to mediator of interest
-  df_mediator<- FDR_corrected_output$FDR_corrected_output%>%dplyr::filter(mediator == mediator_of_interest)
+  df_mediator<- FDR_corrected_output%>%dplyr::filter(mediator == mediator_of_interest)
 
   # Create list to save tables
   tables_formatted<-list()
@@ -232,6 +232,5 @@ FDRcorrectedTable = function(FDR_corrected_output, mediator_of_interest){
   
   tables_formatted
   
-
 }
 
