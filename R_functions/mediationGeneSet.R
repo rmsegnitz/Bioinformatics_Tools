@@ -511,8 +511,9 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
     for(m in gene.list){
       
       mod.filename= paste(paste(out.dir, "input_models", sep="/"), paste(m, "_models.csv", sep=""), sep="/")
-
-      anova.filename= paste(paste(out.dir, "input_models_anovas", sep="/"), paste(m, "_anovas.csv", sep=""), sep="/")
+      anova.filename= paste(paste(out.dir, "input_models", sep="/"), paste(m, "_anovas.csv", sep=""), sep="/")
+      summary.filename= paste(paste(out.dir, "input_models", sep="/"), paste(m, "_model_summaries.csv", sep=""), sep="/")
+      
       
       mods.df<-
         mediation.models[[m]][[1]]%>%
@@ -540,8 +541,13 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
       write.csv(mods.df, mod.filename)
       write.csv(mod.anovas.df, anova.filename)
       
+      sink(summary.filename)
+      print("MEDIATOR MODEL")
+      print(mediation.model.sums[[m]][1])
+      print("OUTCOME MODEL")
+      print(mediation.model.sums[[m]][2])
+      sink()
       
- 
     }
 
   
