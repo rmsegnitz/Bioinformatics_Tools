@@ -512,7 +512,7 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
       
       mod.filename= paste(paste(out.dir, "input_models", sep="/"), paste(m, "_models.csv", sep=""), sep="/")
       anova.filename= paste(paste(out.dir, "input_models", sep="/"), paste(m, "_anovas.csv", sep=""), sep="/")
-      summary.filename= paste(paste(out.dir, "input_models", sep="/"), paste(m, "_model_summaries.csv", sep=""), sep="/")
+      summary.filename= paste(paste(out.dir, "input_models", sep="/"), paste(m, "_model_summaries.txt", sep=""), sep="/")
       
       
       mods.df<-
