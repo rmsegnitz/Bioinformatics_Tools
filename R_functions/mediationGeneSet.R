@@ -124,6 +124,8 @@ mediationGeneSet<- function(model.data,
   ###### SETUP OUTPUT STORAGE ######
   mediation.anovas<-list()
   mediation.models<-list()
+  mediation.model.sums<-list()
+  mediation.model.singularity<-list()
   mediation.output<-list()
   mediation.summary<-list()
   mediation.summary.mat<-list()
@@ -186,11 +188,17 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
       out.fit<-lmer(out.formula, model.data)
       
       # Save input model output
-      mediation.models[[paste(i,"mediator",sep="_")]]<-summary(med.fit)
-      mediation.models[[paste(i,"outcome",sep="_")]]<-summary(out.fit)
+      mediation.model.sums[[i]][[paste(i,"mediator",sep="_")]]<-summary(med.fit)
+      mediation.model.sums[[i]][[paste(i,"outcome",sep="_")]]<-summary(out.fit)
       
-      mediation.anovas[[paste(i,"mediator_Anova",sep="_")]]<-car::Anova(med.fit)
-      mediation.anovas[[paste(i,"outcome_Anova",sep="_")]]<-car::Anova(out.fit)
+      mediation.models[[i]][[paste(i,"mediator",sep="_")]]<-broom.mixed::tidy(med.fit)
+      mediation.models[[i]][[paste(i,"outcome",sep="_")]]<-broom.mixed::tidy(out.fit)
+      
+      mediation.model.singularity[[i]][[paste(i,"mediator",sep="_")]]<-isSingular(med.fit)
+      mediation.model.singularity[[i]][[paste(i,"outcome",sep="_")]]<-isSingular(out.fit)
+      
+      mediation.anovas[[i]][[paste(i,"mediator_Anova",sep="_")]]<-broom::tidy(car::Anova(med.fit))
+      mediation.anovas[[i]][[paste(i,"outcome_Anova",sep="_")]]<-broom::tidy(car::Anova(out.fit))
       
       # Run moderation analysis for each set of contrasts
       for (j in 1:length(t.c.contrasts)){
@@ -348,11 +356,19 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
       out.fit<-lm(out.formula, model.data)
       
       # Save input model output
-      mediation.models[[paste(i,"mediator",sep="_")]]<-summary(med.fit)
-      mediation.models[[paste(i,"outcome",sep="_")]]<-summary(out.fit)
-
-      mediation.anovas[[paste(i,"mediator_Anova",sep="_")]]<-car::Anova(med.fit)
-      mediation.anovas[[paste(i,"outcome_Anova",sep="_")]]<-car::Anova(out.fit)
+      mediation.model.sums[[i]][[paste(i,"mediator",sep="_")]]<-summary(med.fit)
+      mediation.model.sums[[i]][[paste(i,"outcome",sep="_")]]<-summary(out.fit)
+      
+      mediation.models[[i]][[paste(i,"mediator",sep="_")]]<-broom::tidy(med.fit)
+      mediation.models[[i]][[paste(i,"outcome",sep="_")]]<-broom::tidy(out.fit)
+      
+      mediation.model.singularity[[i]][[paste(i,"mediator",sep="_")]]<-isSingular(med.fit)
+      mediation.model.singularity[[i]][[paste(i,"outcome",sep="_")]]<-isSingular(out.fit)
+      
+      mediation.anovas[[i]][[paste(i,"mediator_Anova",sep="_")]]<-broom::tidy(car::Anova(med.fit))
+      mediation.anovas[[i]][[paste(i,"outcome_Anova",sep="_")]]<-broom::tidy(car::Anova(out.fit))
+      
+      
       
       # Run moderation analysis for each set of contrasts
       for (j in 1:length(t.c.contrasts)){
@@ -492,21 +508,40 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
   ## Save input model summaries and anovas
     dir.create(paste(out.dir, "input_models", sep="/"), showWarnings = FALSE)
     
-    for(m in 1:length(mediation.models)){
-      filename= paste(paste(out.dir, "input_models", sep="/"), paste(names(mediation.models)[[m]], ".txt", sep=""), sep="/")
-      # Setup capture file
-      cat(paste("Input Model Summary & ANOVA:", names(mediation.models)[[m]], sep=" "), file=filename)
-      # add 2 newlines
-      cat("\n\n", file = filename, append = TRUE)
-      # export anova test output
-      cat("SUMMARY\n", file = filename, append = TRUE)
-      capture.output(summary(mediation.models[[m]]), file = filename, append = TRUE)
-      # add 2 newlines
-      cat("\n\n", file = filename, append = TRUE)
-      # export anova test output
-      cat("ANOVA\n", file = filename, append = TRUE)
-      capture.output(print(mediation.anovas[[m]]), file = filename, append = TRUE)
+    for(m in gene.list){
+      
+      mod.filename= paste(paste(out.dir, "input_models", sep="/"), paste(m, "_models.csv", sep=""), sep="/")
 
+      anova.filename= paste(paste(out.dir, "input_models_anovas", sep="/"), paste(m, "_anovas.csv", sep=""), sep="/")
+      
+      mods.df<-
+        mediation.models[[m]][[1]]%>%
+        mutate(model = "mediator")%>%
+        mutate(DV = m)%>%
+        mutate(isModelSingular = mediation.model.singularity[[m]][1])%>%
+        bind_rows(
+          mediation.models[[m]][[2]]%>%
+            mutate(model = "outcome")%>%
+            mutate(DV = outcome)%>%
+            mutate(isModelSingular = mediation.model.singularity[[m]][2]))
+      
+      mod.anovas.df<-
+        mediation.anovas[[m]][[1]]%>%
+        mutate(model = "mediator")%>%
+        mutate(DV = m)%>%
+        mutate(isModelSingular = mediation.model.singularity[[m]][1])%>%
+        bind_rows(
+          mediation.anovas[[m]][[2]]%>%
+            mutate(model = "outcome")%>%
+            mutate(DV = outcome)%>%
+            mutate(isModelSingular = mediation.model.singularity[[m]][2]))
+      
+      # Save model info
+      write.csv(mods.df, mod.filename)
+      write.csv(mod.anovas.df, anova.filename)
+      
+      
+ 
     }
 
   
