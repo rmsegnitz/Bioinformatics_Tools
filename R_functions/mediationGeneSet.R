@@ -230,7 +230,8 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
             mutate(group = temp.fun(Effect))%>%
             separate(Effect, sep="\\(", into=c("Effect", "temp.label"))%>%
             mutate(group=fct_relevel(group, paste(t.c.contrasts[[j]][1]), paste(t.c.contrasts[[j]][2]), "Average", "Total"))%>%
-            mutate(Effect=fct_relevel(Effect, "ADE", "ACME", "Total Effect"))
+            mutate(Effect=fct_relevel(Effect, "ADE", "ACME", "Total Effect"))%>%
+            suppressWarnings() # suppresses unimportant warning from separate command
           
           # Define x axis range (use extreme values for all coef/proportion columns so that axes match)
           x.axis.lims<-plot_df%>%
@@ -399,7 +400,8 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
               mutate(group = temp.fun(Effect))%>%
               separate(Effect, sep="\\(", into=c("Effect", "temp.label"))%>%
               mutate(group=fct_relevel(group, paste(t.c.contrasts[[j]][1]), paste(t.c.contrasts[[j]][2]), "Average", "Total"))%>%
-              mutate(Effect=fct_relevel(Effect, "ADE", "ACME", "Total Effect"))
+              mutate(Effect=fct_relevel(Effect, "ADE", "ACME", "Total Effect"))%>%
+              suppressWarnings() # suppresses unimportant warning from separate command
             
             # Define x axis limits using extreme values from all estimate/proportion columns so that axes match 
             x.axis.lims<-plot_df%>%
