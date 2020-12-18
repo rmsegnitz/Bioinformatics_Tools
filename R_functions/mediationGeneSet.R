@@ -137,7 +137,7 @@ if(!is.null(color.groups) & !all(unlist(t.c.contrasts) %in% names(color.groups))
 
 if(is.null(color.groups)){plot.colors = c("#000000","#E69F00","#85C0F9","#601A4A")}
   
-if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% names(color.groups)){plot.colors<-color.groups} else 
+if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% names(color.groups)){plot.colors<-color.groups} else
   if("Average" %in% names(color.groups)){plot.colors<- c(color.groups, c("Total" = "#601A4A"))} else if("Total" %in% names(color.groups)){
     plot.colors<- c(color.groups, c("Average" = "#85C0F9"))} else {plot.colors<- c(color.groups, c("Average" = "#85C0F9" , "Total" = "#601A4A"))}}
 
@@ -194,11 +194,11 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
       mediation.models[[i]][[paste(i,"mediator",sep="_")]]<-broom.mixed::tidy(med.fit)
       mediation.models[[i]][[paste(i,"outcome",sep="_")]]<-broom.mixed::tidy(out.fit)
       
-      mediation.model.singularity[[i]][[paste(i,"mediator",sep="_")]]<-isSingular(med.fit)
-      mediation.model.singularity[[i]][[paste(i,"outcome",sep="_")]]<-isSingular(out.fit)
-      
       mediation.anovas[[i]][[paste(i,"mediator_Anova",sep="_")]]<-broom::tidy(car::Anova(med.fit))
       mediation.anovas[[i]][[paste(i,"outcome_Anova",sep="_")]]<-broom::tidy(car::Anova(out.fit))
+      
+      mediation.model.singularity[[i]][[paste(i,"mediator",sep="_")]]<-isSingular(med.fit)
+      mediation.model.singularity[[i]][[paste(i,"outcome",sep="_")]]<-isSingular(out.fit)
       
       # Run moderation analysis for each set of contrasts
       for (j in 1:length(t.c.contrasts)){
@@ -363,8 +363,8 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
       mediation.models[[i]][[paste(i,"mediator",sep="_")]]<-broom::tidy(med.fit)
       mediation.models[[i]][[paste(i,"outcome",sep="_")]]<-broom::tidy(out.fit)
       
-      mediation.model.singularity[[i]][[paste(i,"mediator",sep="_")]]<-isSingular(med.fit)
-      mediation.model.singularity[[i]][[paste(i,"outcome",sep="_")]]<-isSingular(out.fit)
+      mediation.model.singularity[[i]][[paste(i,"mediator",sep="_")]]<-NA # isSingular check not relevent for class "lm"
+      mediation.model.singularity[[i]][[paste(i,"outcome",sep="_")]]<-NA
       
       mediation.anovas[[i]][[paste(i,"mediator_Anova",sep="_")]]<-broom::tidy(car::Anova(med.fit))
       mediation.anovas[[i]][[paste(i,"outcome_Anova",sep="_")]]<-broom::tidy(car::Anova(out.fit))
