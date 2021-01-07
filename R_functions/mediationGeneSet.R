@@ -49,7 +49,8 @@
 #  boot = (logical) Whether to generate CIs by non-parametric bootrapping. default is FALSE, which will produce CIs via quasi Bayesian approximation.
 #  boot.ci.type = (character) Which type of CIs to generate if boot=TRUE. Defaults to "perc" (percentile-based), but can be "bca"(bias-coorected & accellerated)
 #  sims = (numeric) Number of simulations to use when generating confidence intervals. Defaults to 1000. 
-# robustSE = (logical) Whether or not to use robust, heteroscedasticity consistent errors when usuing quasi-Bayesian estimation. Default = FALSE.
+#  robustSE = (logical) Whether or not to use robust, heteroscedasticity consistent errors when usuing quasi-Bayesian estimation. Default = FALSE.
+#  seed = (numeric) Set.seed prior to running mediate() and random bootstraps in order to reproduce results. Default = NULL
 
 # EXAMPLE USAGE
 # mediation.analysis<-
@@ -93,6 +94,7 @@ mediationGeneSet<- function(model.data,
                             random.effect,
                             boot=FALSE,
                             sims=1000,
+                            seed=NULL,
                             boot.ci.type="perc",
                             robustSE=FALSE
                             ){
@@ -127,6 +129,7 @@ mediationGeneSet<- function(model.data,
   mediation.model.sums<-list()
   mediation.model.singularity<-list()
   mediation.output<-list()
+  mediation.estimate.simulations<-list()
   mediation.summary<-list()
   mediation.summary.mat<-list()
   mediation.plots<-list()
@@ -206,6 +209,7 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
         print(paste("Running Mediation Analysis |", i,"|", "Treatment:",t.c.contrasts[[j]][1],", Control:",t.c.contrasts[[j]][2], sep=" "))
         
         # run mediation analysis
+        set.seed(seed)
         results = mediate(med.fit, out.fit, treat=treatment, mediator=i,
                           control.value = t.c.contrasts[[j]][2], 
                           treat.value = t.c.contrasts[[j]][1], boot = boot, sims = sims, boot.ci.type = boot.ci.type, robustSE = robustSE)
@@ -221,7 +225,7 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
           
           temp.fun2<- function(x){ifelse(stringi::stri_detect_fixed(x, "Prop."), "Proportion", "Effect")}
           
-          
+          ## FOREST PLOTS ##
           
           # create plotting data frame from mediation output 
           plot_df<-as.data.frame(extractMediationSummary(results))%>%
@@ -291,10 +295,68 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
           
           mediation_plot<-plot3
           
-          # save plot
+          
+          ### DENSITY PLOTS ###
+          mediation.estimate.sims<-data.frame(
+            ACME.control = results$d0.sims,
+            ACME.treatment = results$d1.sims,
+            ACME.avg = results$d.avg.sims,
+            ADE.control = results$z0.sims,
+            ADE.treatment = results$z1.sims,
+            ADE.avg = results$z.avg.sims,
+            prop_mediated.control = results$n0.sims,
+            prop_mediated.treatment = results$n1.sims,
+            prop_mediated.avg = results$n.avg.sims,
+            total_effect.total = results$tau.sims)%>%
+            gather(effect, estimate)%>%
+            separate(effect, c("effect", "group","sim"), sep="[.]")%>%
+            mutate(group = plyr::revalue(group, c("control" =  paste(t.c.contrasts[[j]][2]),  "treatment" =  paste(t.c.contrasts[[j]][1]))))
+          
+          # plot densities
+         
+          plot.ACME.dens<-
+            mediation.estimate.sims%>%
+            filter(effect == "ACME" & group !="avg")%>%
+            ggplot(aes(x = estimate, color = group, fill = group))+
+            geom_density(alpha = 0.4)+
+            geom_vline(xintercept = 0, linetype = "dashed")+
+            xlab("Avg. Causal Mediation Effect")+
+            theme_bw()+
+            theme(axis.text.y=element_blank(),
+                  axis.ticks.y = element_blank(),
+                  legend.title = element_blank(),
+                  panel.background = element_blank(),
+                  panel.grid.major = element_blank(),
+                  panel.grid.minor = element_blank(),
+                  panel.border = element_rect(colour = "black", fill=NA, size=1))
+            
+            
+          plot.ACME.ADE.dens<-
+            dens.plot.acme%>%
+            filter(effect %in% c("ACME", "ADE") & group !="avg")%>%
+            ggplot(aes(x = estimate, color = group, linetype = effect))+
+            geom_density(size=1)+
+            geom_vline(xintercept = 0, linetype = "dashed")+
+            xlab("Avg. Causal Mediation Effect")+
+            theme_bw()+
+            theme(axis.text.y=element_blank(),
+                  axis.ticks.y = element_blank(),
+                  legend.title = element_blank(),
+                  panel.background = element_blank(),
+                  panel.grid.major = element_blank(),
+                  panel.grid.minor = element_blank(),
+                  panel.border = element_rect(colour = "black", fill=NA, size=1))
+          
+          # save plots
           mediation.plots[[
             paste(i,paste("T",t.c.contrasts[[j]][1], sep="-"),paste("C",t.c.contrasts[[j]][2], sep="-"), sep="_")
-            ]]<-mediation_plot
+            ]][["plot.forest"]]<-mediation_plot
+          mediation.plots[[
+            paste(i,paste("T",t.c.contrasts[[j]][1], sep="-"),paste("C",t.c.contrasts[[j]][2], sep="-"), sep="_")
+          ]][["plot.dens.ACME"]]<-plot.ACME.dens
+          mediation.plots[[
+            paste(i,paste("T",t.c.contrasts[[j]][1], sep="-"),paste("C",t.c.contrasts[[j]][2], sep="-"), sep="_")
+          ]][["plot.dens.ACME.ADE"]]<-plot.ACME.ADE.dens
           
           
         }
@@ -312,6 +374,10 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
         mediation.summary.mat[[
           paste(i,paste("T",t.c.contrasts[[j]][1], sep="-"),paste("C",t.c.contrasts[[j]][2], sep="-"), sep="_")
           ]]<-extractMediationSummary(results)
+        
+        mediation.estimate.simulations[[
+          paste(i,paste("T",t.c.contrasts[[j]][1], sep="-"),paste("C",t.c.contrasts[[j]][2], sep="-"), sep="_")
+        ]]<-mediation.estimate.sims
         
       
         print("Analysis complete.")
@@ -376,6 +442,7 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
         print(paste("Running Mediation Analysis |", i,"|", "Treatment:",t.c.contrasts[[j]][1],", Control:",t.c.contrasts[[j]][2], sep=" "))
         
         # Run mediation analysis.
+        set.seed(seed)
         results = mediate(med.fit, out.fit, treat=treatment, mediator=i,
                           control.value = t.c.contrasts[[j]][2], 
                           treat.value = t.c.contrasts[[j]][1], boot = boot, sims = sims, boot.ci.type = boot.ci.type)
@@ -461,10 +528,71 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
             
             mediation_plot<-plot3
             
-            # save plot
+            
+            
+            
+            ### DENSITY PLOTS ###
+            mediation.estimate.sims<-data.frame(
+              ACME.control = results$d0.sims,
+              ACME.treatment = results$d1.sims,
+              ACME.avg = results$d.avg.sims,
+              ADE.control = results$z0.sims,
+              ADE.treatment = results$z1.sims,
+              ADE.avg = results$z.avg.sims,
+              prop_mediated.control = results$n0.sims,
+              prop_mediated.treatment = results$n1.sims,
+              prop_mediated.avg = results$n.avg.sims,
+              total_effect.total = results$tau.sims)%>%
+              gather(effect, estimate)%>%
+              separate(effect, c("effect", "group","sim"), sep="[.]")%>%
+              mutate(group = plyr::revalue(group, c("control" =  paste(t.c.contrasts[[j]][2]),  "treatment" =  paste(t.c.contrasts[[j]][1]))))
+            
+            # plot densities
+            
+            plot.ACME.dens<-
+              mediation.estimate.sims%>%
+              filter(effect == "ACME" & group !="avg")%>%
+              ggplot(aes(x = estimate, color = group, fill = group))+
+              geom_density(alpha = 0.4)+
+              geom_vline(xintercept = 0, linetype = "dashed")+
+              xlab("Avg. Causal Mediation Effect")+
+              theme_bw()+
+              theme(axis.text.y=element_blank(),
+                    axis.ticks.y = element_blank(),
+                    legend.title = element_blank(),
+                    panel.background = element_blank(),
+                    panel.grid.major = element_blank(),
+                    panel.grid.minor = element_blank(),
+                    panel.border = element_rect(colour = "black", fill=NA, size=1))
+            
+            
+            plot.ACME.ADE.dens<-
+              dens.plot.acme%>%
+              filter(effect %in% c("ACME", "ADE") & group !="avg")%>%
+              ggplot(aes(x = estimate, color = group, linetype = effect))+
+              geom_density(size=1)+
+              geom_vline(xintercept = 0, linetype = "dashed")+
+              xlab("Avg. Causal Mediation Effect")+
+              theme_bw()+
+              theme(axis.text.y=element_blank(),
+                    axis.ticks.y = element_blank(),
+                    legend.title = element_blank(),
+                    panel.background = element_blank(),
+                    panel.grid.major = element_blank(),
+                    panel.grid.minor = element_blank(),
+                    panel.border = element_rect(colour = "black", fill=NA, size=1))
+            
+            # save plots
             mediation.plots[[
               paste(i,paste("T",t.c.contrasts[[j]][1], sep="-"),paste("C",t.c.contrasts[[j]][2], sep="-"), sep="_")
-              ]]<-mediation_plot
+            ]][["plot.forest"]]<-mediation_plot
+            mediation.plots[[
+              paste(i,paste("T",t.c.contrasts[[j]][1], sep="-"),paste("C",t.c.contrasts[[j]][2], sep="-"), sep="_")
+            ]][["plot.dens.ACME"]]<-plot.ACME.dens
+            mediation.plots[[
+              paste(i,paste("T",t.c.contrasts[[j]][1], sep="-"),paste("C",t.c.contrasts[[j]][2], sep="-"), sep="_")
+            ]][["plot.dens.ACME.ADE"]]<-plot.ACME.ADE.dens
+            
             
         
         }
@@ -483,6 +611,10 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
         mediation.summary.mat[[
           paste(i,paste("T",t.c.contrasts[[j]][1], sep="-"),paste("C",t.c.contrasts[[j]][2], sep="-"), sep="_")
           ]]<-extractMediationSummary(results)
+        
+        mediation.estimate.simulations[[
+          paste(i,paste("T",t.c.contrasts[[j]][1], sep="-"),paste("C",t.c.contrasts[[j]][2], sep="-"), sep="_")
+        ]]<-mediation.estimate.sims
         
  
         print("Analysis complete.")
@@ -504,6 +636,11 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
                      paste(paste(out.dir, "mediation_output", sep="/"),
                            gsub(" ","_",gsub("/","_", paste(names(mediation.summary[s]),
                                  ".csv", sep=""))), sep="/"))
+      write.csv(mediation.estimate.simulations[[s]],
+                paste(paste(out.dir, "mediation_output", sep="/"),
+                      gsub(" ","_",gsub("/","_", paste(names(mediation.summary[s]),
+                                                       ".sims.csv", sep=""))), sep="/"))
+      
     }
     
  
@@ -561,7 +698,7 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
     
     for(p in 1:length(mediation.plots)){
       
-      ggsave(plot=mediation.plots[[p]],
+      ggsave(plot=mediation.plots[[p]][["forest.plot"]],
         filename= paste(paste(plot.dir, "mediation_output_plots", sep="/"), gsub(" ","_", gsub("/","_", paste(names(mediation.plots[p]), 
                                                                                                 ".png", sep=""))), sep="/"),
         dpi=300, height = plot.height, width = plot.width)
@@ -572,12 +709,14 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
   
   #################  RETURN OUTPUT ##############
 
-  if(plots){list(output=mediation.output,
+  if(plots){list(mediation.output=mediation.output,
+                 mediation.estimate.sims = mediation.estimate.simulations,
                  summary=mediation.summary.mat,
                  input.anovas=mediation.anovas,
                  plots=mediation.plots, 
                  contrasts = t.c.contrasts)}else{
-                          list(output=mediation.output,
+                          list(mediation.output=mediation.output,
+                               mediation.estimate.sims = mediation.estimate.sims,
                                summary=mediation.summary.mat,
                                input.anovas=mediation.anovas, 
                                contrasts = t.c.contrasts)}
