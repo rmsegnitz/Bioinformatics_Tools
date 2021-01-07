@@ -208,6 +208,10 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
         
         print(paste("Running Mediation Analysis |", i,"|", "Treatment:",t.c.contrasts[[j]][1],", Control:",t.c.contrasts[[j]][2], sep=" "))
         
+        #TEMP CODE
+        rnorm(5, 5)
+        rnorm(4)
+        
         # run mediation analysis
         set.seed(seed)
         results = mediate(med.fit, out.fit, treat=treatment, mediator=i,
@@ -440,6 +444,10 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
       # Run moderation analysis for each set of contrasts
       for (j in 1:length(t.c.contrasts)){
         print(paste("Running Mediation Analysis |", i,"|", "Treatment:",t.c.contrasts[[j]][1],", Control:",t.c.contrasts[[j]][2], sep=" "))
+        
+        #TEMP CODE
+        rnorm(5, 5)
+        rnorm(4)
         
         # Run mediation analysis.
         set.seed(seed)
