@@ -332,7 +332,7 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
             
             
           plot.ACME.ADE.dens<-
-            dens.plot.acme%>%
+            mediation.estimate.sims%>%
             filter(effect %in% c("ACME", "ADE") & group !="avg")%>%
             ggplot(aes(x = estimate, color = group, linetype = effect))+
             geom_density(size=1)+
@@ -567,7 +567,7 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
             
             
             plot.ACME.ADE.dens<-
-              dens.plot.acme%>%
+              mediation.estimate.sims%>%
               filter(effect %in% c("ACME", "ADE") & group !="avg")%>%
               ggplot(aes(x = estimate, color = group, linetype = effect))+
               geom_density(size=1)+
