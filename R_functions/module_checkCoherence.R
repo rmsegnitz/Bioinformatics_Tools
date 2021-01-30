@@ -7,29 +7,39 @@
 
 module_checkCoherence<-function(module_gene_sets, voom_obj, geneSet = "geneSet",module_set="STUDY", sample_set="STUDY", remove_sets = NULL){
 
+require(gtools)
+  
 moduleSets<- module_gene_sets
 voomData<-voom_obj
-  
-# calculate the gene set means
-uniGS<-as.character(unique(moduleSets$geneSet))
-uniGS<-sort(uniGS)
-nasalGSsub<-c()
-for (i in 1:length(uniGS)){
-  curGS<-uniGS[i]
+
+#-----------------------------  
+# Calculate the gene set means (module expression)
+#-----------------------------
+uniGS<-moduleSets$geneSet%>%unique()%>%as.character()%>%mixedsort() # Pull unique modules & order correctly
+
+GSsub<-c()
+GSabsent<-list()
+
+for (i in uniGS){
+  curGS<-i
   curIDs<-as.character(moduleSets$ensemblID[which(moduleSets$geneSet==curGS)])
   matchIndex<-match(curIDs, rownames(voomData))
   if (any(is.na(matchIndex)))
     matchIndex<-matchIndex[-which(is.na(matchIndex))]
+    GSabsent[[i]]<-curIDs[which(curIDs %notin% rownames(voomData))]
   if (length(curIDs) > 1)
-    nasalGSsub<-rbind(nasalGSsub, apply(voomData$E[matchIndex,], 2, mean))
+    GSsub<-rbind(GSsub, apply(voomData$E[matchIndex,], 2, mean))
   else
-    nasalGSsub<-rbind(nasalGSsub, voomData$E[matchIndex,])
+    GSsub<-rbind(GSsub, voomData$E[matchIndex,])
 }
-rownames(nasalGSsub)<-uniGS
+rownames(GSsub)<-uniGS
 
+if(length(unlist(GSabsent))>0){
+print(paste0(length(unique(unlist(GSabsent))), " Module Genes absent in voom object. Missing genes accesible in .$GSabsent"))}
 
-
-
+#----------------------------
+#  Set function for correlation p values
+#----------------------------
 
 # Correlation p value function 
 cor2pvalue = function(r, n) {
@@ -41,60 +51,109 @@ cor2pvalue = function(r, n) {
   return(out)
 }
 
-uniNasal<-sort(unique(as.character(moduleSets$geneSet)))
+
 # remove gene sets that are zero
-if(!is.null(remove_sets)){remSets<-remove_sets
-uniNasal<-uniNasal[-which(uniNasal %in% remSets)]}
+if(!is.null(remove_sets)){uniGS<-uniGS[-which(uniGS %in% remove_sets)]}
 
 # Setup storage
-nasalSubGeneCorDF<-c()
-nasalSubGeneCorMedian<-c()
-nasalSubGenePMedian<-c()
+SubGeneCorDF<-c()
+SubGeneCorMedian<-c()
+SubGenePMedian<-c()
 
-for (i in 1:length(uniNasal)){
-  curSet<-uniNasal[i]
+for (i in uniGS){
+  curSet<-i
   curIDs<-as.character(moduleSets$ensemblID[which(moduleSets$geneSet==curSet)])
   matchIndex<-match(curIDs, rownames(voomData))
-  if (any(is.na(matchIndex)))
-    matchIndex<-matchIndex[-which(is.na(matchIndex))]
+  if (any(is.na(matchIndex))){
+    matchIndex<-matchIndex[-which(is.na(matchIndex))]}
   
-  setCor<-cor(t(voomData$E[matchIndex,]))
-  n<-t(!is.na(t(voomData$E[matchIndex,]))) %*% (!is.na(t(voomData$E[matchIndex,])))
+  setCor<-cor(t(voomData$E[matchIndex,])) # Calculate pairwise gene correlations from expression data
+  n<-t(!is.na(t(voomData$E[matchIndex,]))) %*% (!is.na(t(voomData$E[matchIndex,]))) # create matrix with sample size to calculate correlation p (dim=curIDs*curIDs, value = sample size)
   
   allCorInfo<-cor2pvalue(setCor, n)
   setP<-allCorInfo$p
-  allCorVals<-setCor[upper.tri(setCor)]
-  allPVals<-setP[upper.tri(setP)]
+  allCorVals<-setCor[upper.tri(setCor)] # Extract upper triangle correlation values
+  allPVals<-setP[upper.tri(setP)] # Extract upper triangle correlation p values
   
-  nasalSubGeneCorDF<-rbind(nasalSubGeneCorDF, cbind(allCorVals, rep(curSet, length(allCorVals))))
-  nasalSubGeneCorMedian<-c(nasalSubGeneCorMedian, median(allCorVals))
-  nasalSubGenePMedian<-c(nasalSubGenePMedian, median(allPVals))
-  #  print(i) #52 modules
+  SubGeneCorDF<-rbind(SubGeneCorDF, cbind(allCorVals, allPVals, rep(curSet, length(allCorVals))))
 }
 
 
-nasalSubGeneCorDF<-as.data.frame(nasalSubGeneCorDF)
-colnames(nasalSubGeneCorDF)<-c("Cor","Set")
-nasalSubGeneCorDF$Cor<-as.numeric(as.character(nasalSubGeneCorDF$Cor))
-#Reorder sets
-nasalSubGeneCorDF$Set<-factor(as.character(nasalSubGeneCorDF$Set), levels=c(uniNasal[c(1:22,33,44,47:52,23:32,34:43,45:46)]))
+
+# Assemble and format results dataframe
+SubGeneCorDF<-as.data.frame(SubGeneCorDF)%>%
+  rename(Cor = allCorVals, P = allPVals, Set = V3)%>%
+  mutate(Cor = as.numeric(as.character(Cor)))%>%
+  mutate(P = as.numeric(as.character(P)))%>%
+  mutate(Set = factor(Set, levels =uniGS))%>%
+  dplyr::select(Set, Cor, P)
+
 
 #Boxplot of all pairwise correlations per module
-
-coherence_boxplot<-
-nasalSubGeneCorDF%>%
-  mutate(Set = factor(Set, levels=unique(nasalSubGeneCorDF$Set)[order(as.numeric(as.character(unique(nasalSubGeneCorDF$Set))))]))%>%
+coherence_boxplot_cor<-
+SubGeneCorDF%>%
   ggplot(aes(y=Cor, x=Set))+
+  geom_hline(yintercept =0, color="black")+
   geom_boxplot(outlier.shape = NA)+
   scale_y_continuous(breaks=seq(0,1,0.2))+
-  ylab("Correlation")+
+  ylab("Correlation Strength")+
   xlab(paste0(module_set, " Modules"))+
-  ggtitle(paste0(module_set, " Module Coherence in ", sample_set, " Samples"))+
+  labs(title = paste0(module_set, " Module Coherence in ", sample_set, " Samples"),
+       subtitle = "Inter-Gene PearsonCorrelation")+
   theme_bw()+
-  theme(panel.grid.minor = element_blank(), panel.grid.major.x = element_blank(), plot.title = element_text(hjust=0.5))
+  theme(panel.grid.minor = element_blank(), 
+        panel.grid.major.x = element_blank(), 
+        plot.title = element_text(hjust=0.5), 
+        plot.subtitle = element_text(hjust=0.5))
 
-print(coherence_boxplot)
+coherence_boxplot_p<-
+  SubGeneCorDF%>%
+  ggplot(aes(y=-log10(P), x=Set))+
+  geom_hline(yintercept =0, color="black")+
+  geom_boxplot(outlier.shape = NA)+
+  geom_hline(yintercept = -log10(0.05), color="red", linetype="dashed")+
+  ylab("-log10(Correlation P Value)")+
+  xlab(paste0(module_set, " Modules"))+
+  labs(title = paste0(module_set, " Module Coherence in ", sample_set, " Samples"),
+       subtitle = "Inter-Gene PearsonCorrelation")+
+  theme_bw()+
+  theme(panel.grid.minor = element_blank(), 
+        panel.grid.major.x = element_blank(), 
+        plot.title = element_text(hjust=0.5), 
+        plot.subtitle = element_text(hjust=0.5))
 
-return(list(coherence_boxplot = coherence_boxplot, subgene_correlation_df = nasalSubGeneCorDF))
+# Or with facets
+coherence_boxplot_faceted<-
+  SubGeneCorDF%>%
+  mutate(negLogP = -log10(P))%>%
+  pivot_longer(cols = c(Cor, negLogP))%>%
+  mutate(h_line = ifelse(name == "negLogP", -log10(0.05), NA))%>%
+  ggplot(aes(y=value, x=Set))+
+  geom_hline(yintercept =0, color="black")+
+  geom_boxplot(outlier.shape = NA)+
+  geom_hline(aes(yintercept = h_line), color = "red", linetype="dashed")+
+  #scale_y_continuous(breaks=seq(0,1,0.2))+
+  #ylab("Inter-Gene PearsonCorrelation")+
+  xlab(paste0(module_set, " Modules"))+
+  #ggtitle(paste0(module_set, " Module Coherence in ", sample_set, " Samples"))+
+  labs(title = paste0(module_set, " Module Coherence in ", sample_set, " Samples"),
+       subtitle = "Inter-Gene PearsonCorrelation")+
+  theme_bw()+
+  theme(axis.title.y = element_blank(),
+        strip.placement = "outside",
+        strip.background = element_blank(),
+        panel.grid.minor = element_blank(), 
+        panel.grid.major.x = element_blank(),
+        plot.title = element_text(hjust=0.5), 
+        plot.subtitle = element_text(hjust=0.5))+
+  facet_wrap(~name, scales = "free_y", strip.position = "left", labeller = labeller(name = c("Cor" = "Correlation Strength", "negLogP" = "-log10(Correlation P Value)")))
+
+
+print(coherence_boxplot_faceted)
+
+return(list(coherence_boxplot_combined = coherence_boxplot_faceted, 
+            coherence_boxplot_cor = coherence_boxplot_cor, 
+            coherence_boxplot_p = coherence_boxplot_p,  
+            subgene_correlation_df = SubGeneCorDF))
 
 }
