@@ -7,7 +7,10 @@
 
 module_checkCoherence<-function(module_gene_sets, voom_obj, geneSet = "geneSet",module_set="STUDY", sample_set="STUDY", remove_sets = NULL){
 
+# Load libraries
 require(gtools)
+require(tidyverse) 
+`%notin%`<-Negate(`%in%`)
   
 moduleSets<- module_gene_sets
 voomData<-voom_obj
