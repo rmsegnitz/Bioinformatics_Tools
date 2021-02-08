@@ -18,6 +18,13 @@ module_calcModExpression<-function(module_gene_sets, voom_obj, gene_set = "geneS
     mutate(geneSet = get(gene_set))%>%
     mutate(geneSet = as.character(geneSet))
   
+  if(!is.null(names)){
+    moduleSets<-
+      moduleSets%>%
+      mutate(module_names = get(names))%>%
+      mutate(module_names = as.character(module_names))
+  }
+  
   #-----------------------------  
   # Calculate the gene set means (module expression)
   #-----------------------------
@@ -48,16 +55,17 @@ module_calcModExpression<-function(module_gene_sets, voom_obj, gene_set = "geneS
       as.data.frame()%>%
       rownames_to_column("geneSet")%>%
       mutate(geneSet = as.character(geneSet))%>%
-      left_join(dplyr::select(moduleSets, geneSet, names), by = geneSet)%>%
+      left_join(dplyr::select(moduleSets, geneSet, module_names), by = "geneSet")%>%
       distinct()%>%
       dplyr::select(-geneSet)%>%
-      column_to_rownames(names)%>%
+      column_to_rownames("module_names")%>%
       as.matrix()}
+  
   
   #-----------------
   # Return output
   #-----------------
-  return(GSsub)
+  return(list(mod_counts = GSsub, GSabsent = GSabsent))
   
 }
   
