@@ -91,6 +91,12 @@ SubGeneCorDF<-as.data.frame(SubGeneCorDF)%>%
   mutate(Set = factor(Set, levels =uniGS))%>%
   dplyr::select(Set, Cor, P)
 
+SubGeneCorDF_summary<-
+  SubGeneCorDF%>%
+  group_by(Set)%>%
+  summarise(median_mod_correlation = median(Cor),
+            median_mod_p = median(P))
+
 
 #Boxplot of all pairwise correlations per module
 coherence_boxplot_cor<-
