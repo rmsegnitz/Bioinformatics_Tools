@@ -104,6 +104,7 @@ SubGeneCorDF%>%
   ggplot(aes(y=Cor, x=Set))+
   geom_hline(yintercept =0, color="black")+
   geom_boxplot(outlier.shape = NA)+
+  geom_hline(yintercept = 0.3, linetype = "dashed", color = "red")+
   scale_y_continuous(breaks=seq(0,1,0.2))+
   ylab("Correlation Strength")+
   xlab(paste0(module_set, " Modules"))+
@@ -121,6 +122,7 @@ coherence_boxplot_p<-
   geom_hline(yintercept =0, color="black")+
   geom_boxplot(outlier.shape = NA)+
   geom_hline(yintercept = -log10(0.05), color="red", linetype="dashed")+
+  geom_hline(yintercept = -log10(0.01), color="red", linetype="dashed")+
   ylab("-log10(Correlation P Value)")+
   xlab(paste0(module_set, " Modules"))+
   labs(title = paste0(module_set, " Module Coherence in ", sample_set, " Samples"),
@@ -132,19 +134,20 @@ coherence_boxplot_p<-
         plot.subtitle = element_text(hjust=0.5))
 
 # Or with facets
+labels_df<-data.frame(name=c("Cor", "negLogP"), 
+                      h_pos = c(0.17, 1.7), h_label= c("r=0.2", "p=0.01"))
+
 coherence_boxplot_faceted<-
   SubGeneCorDF%>%
   mutate(negLogP = -log10(P))%>%
   pivot_longer(cols = c(Cor, negLogP))%>%
-  mutate(h_line = ifelse(name == "negLogP", -log10(0.05), NA))%>%
+  mutate(h_line = ifelse(name == "negLogP", -log10(0.01), 0.2))%>%
   ggplot(aes(y=value, x=Set))+
   geom_hline(yintercept =0, color="black")+
   geom_boxplot(outlier.shape = NA)+
   geom_hline(aes(yintercept = h_line), color = "red", linetype="dashed")+
-  #scale_y_continuous(breaks=seq(0,1,0.2))+
-  #ylab("Inter-Gene PearsonCorrelation")+
+  geom_text(data=labels_df, aes(label = h_label, x=3, y=h_pos), color="red")+
   xlab(paste0(module_set, " Modules"))+
-  #ggtitle(paste0(module_set, " Module Coherence in ", sample_set, " Samples"))+
   labs(title = paste0(module_set, " Module Coherence in ", sample_set, " Samples"),
        subtitle = "Inter-Gene PearsonCorrelation")+
   theme_bw()+
@@ -163,6 +166,7 @@ print(coherence_boxplot_faceted)
 return(list(coherence_boxplot_combined = coherence_boxplot_faceted, 
             coherence_boxplot_cor = coherence_boxplot_cor, 
             coherence_boxplot_p = coherence_boxplot_p,  
-            subgene_correlation_df = SubGeneCorDF))
+            subgene_correlation_df = SubGeneCorDF,
+            subgene_correlation_summary = SubGeneCorDF_summary))
 
 }
