@@ -21,6 +21,7 @@ module_compareModules<-function(module_gene_sets, p.adjustment="bonferroni"){
   
   # Load libraries & tools
   require(gtools)
+  require(patchwork)
   require(tidyverse) 
   require(fuzzySim)
   library(spaa)
@@ -182,18 +183,22 @@ module_compareModules<-function(module_gene_sets, p.adjustment="bonferroni"){
     sorensen_sim_pairwise_meaningful%>%
     full_join(phyper_pairwise_meaningful)%>%
     dplyr::select(study_1, module_1, module_unique_1, study_2, module_2, module_unique_2, sorensen_index, p_hyper, p_hyper_adj)%>%
-    mutate(p_adjust_method = p.adjustment)
+    mutate(p_adjust_method = p.adjustment)%>%
+    mutate(module_1 = factor(module_1, levels = mixedsort(unique(module_1))),
+           module_2 = factor(module_2, levels = mixedsort(unique(module_2))))
   
   
   # Plot values together
   plot_labels<-
     combined_pairwise_meaningful%>%
-    mutate(label = ifelse(p_hyper_adj<0.05 & sorensen_index>0.1, module_1, ""),
+    mutate(label = ifelse(p_hyper_adj<0.05 & sorensen_index>0.1, as.character(module_1), ""),
            study = study_1)%>%
     bind_rows(mutate(combined_pairwise_meaningful,
-                     label = ifelse(p_hyper_adj<0.05 & sorensen_index>0.1, module_2, ""),
+                     label = ifelse(p_hyper_adj<0.05 & sorensen_index>0.1, as.character(module_2), ""),
                      study = study_2))%>%
-    dplyr::select(sorensen_index, p_hyper, p_hyper_adj, label, study)
+    dplyr::select(module_1, study_1, module_2, study_2, sorensen_index, p_hyper, p_hyper_adj, label, study)%>%
+    mutate(module_1_label = ifelse(p_hyper_adj<0.05 & sorensen_index>0.1, as.character(module_1), ""),
+           module_2_label =  ifelse(p_hyper_adj<0.05 & sorensen_index>0.1, as.character(module_2), ""))
   
   module_comparison_plot<-
   combined_pairwise_meaningful%>%
@@ -216,7 +221,81 @@ module_compareModules<-function(module_gene_sets, p.adjustment="bonferroni"){
     labs(fill = "Study")+
     theme_bw()
   
-  return(list(module_comp_df =combined_pairwise_meaningful , module_comp_plot = module_comparison_plot))
+  
+  #-------------------
+  # CREATE MULTI PLOTS
+  #-------------------
+
+# Setup storage for plots 
+multi_plot_list<-list()
+    
+    for(i in unique(moduleSets$study)){ # make plot centric to each study included in the geneSet list 
+      
+      if (i %in% unique(plot_labels$study_1)){ # Determine whether to draw comparisons from $module_1 or $module_2
+        plot_labels_sub<-filter(plot_labels, study_1==i)
+        multi_sub<-
+          combined_pairwise_meaningful%>%
+          filter(study_1==i)%>%
+          ggplot(aes(y=-log10(p_hyper_adj), x=sorensen_index))+
+          geom_point()+
+          geom_hline(yintercept = -log10(0.05), color = "red", linetype = "dashed")+
+          geom_vline(xintercept = 0.1, color = "red", linetype = "dashed")+
+          ggrepel::geom_text_repel(data = dplyr::select(plot_labels, -c(study, label))%>%distinct(),
+                                   aes(label=module_2_label, x =sorensen_index , y = -log10(p_hyper_adj)),
+                                   max.overlaps = Inf,
+                                   min.segment.length = 0, segment.color = "black",
+                                   fontface = 'bold',
+                                   box.padding = unit(0.35, "lines"),
+                                   point.padding = unit(0.5, "lines"))+
+          
+          
+          
+          ylab(" -log10(Adjusted Hypergeometric P Value)")+
+          xlab("Sorensen-Dice Similarity Index")+
+          ggtitle(paste("Focus on ", i))+
+          labs(fill = "Study")+
+          theme_bw()+
+          theme(plot.title = element_text(hjust=0.5))+
+          facet_wrap(~module_1)
+          
+        multi_plot_list[[i]]<-multi_sub
+        
+        } else if (i %notin% plot_labels$study_1 & i %in% plot_labels$study_2){
+        plot_labels_sub<-filter(plot_labels, study_2==i)
+        multi_sub<-
+          combined_pairwise_meaningful%>%
+          filter(study_2==i)%>%
+          ggplot(aes(y=-log10(p_hyper_adj), x=sorensen_index))+
+          geom_point()+
+          geom_hline(yintercept = -log10(0.05), color = "red", linetype = "dashed")+
+          geom_vline(xintercept = 0.1, color = "red", linetype = "dashed")+
+          ggrepel::geom_text_repel(data = dplyr::select(plot_labels, -c(study, label))%>%distinct(),
+                                   aes(label=module_1_label, x =sorensen_index , y = -log10(p_hyper_adj)),
+                                   max.overlaps = Inf,
+                                   min.segment.length = 0, segment.color = "black",
+                                   fontface = 'bold',
+                                   box.padding = unit(0.35, "lines"),
+                                   point.padding = unit(0.5, "lines"))+
+          
+          
+          
+          ylab(" -log10(Adjusted Hypergeometric P Value)")+
+          xlab("Sorensen-Dice Similarity Index")+
+          ggtitle(paste("Focus on ", i))+
+          labs(fill = "Study")+
+          theme_bw()+
+          theme(plot.title = element_text(hjust=0.5))+
+          facet_wrap(~module_2)
+        
+        multi_plot_list[[i]]<-multi_sub
+      }}
+  
+# Assemble plots into multipanel plots.
+module_comparison_plot_multi<-eval(parse(text= paste(paste0("multi_plot_list$", names(multi_plot_list)), collapse = " + ")))
+ 
+  
+
+  return(list(module_comp_df =combined_pairwise_meaningful , module_comp_plot = module_comparison_plot, module_comp_plot_multi=module_comparison_plot_multi))
 }
   
   #-------------------------------------------------
