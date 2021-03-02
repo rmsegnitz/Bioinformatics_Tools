@@ -232,15 +232,17 @@ multi_plot_list<-list()
     for(i in unique(moduleSets$study)){ # make plot centric to each study included in the geneSet list 
       
       if (i %in% unique(plot_labels$study_1)){ # Determine whether to draw comparisons from $module_1 or $module_2
-        plot_labels_sub<-filter(plot_labels, study_1==i)
+        plot_labels_sub<-filter(plot_labels, study_1==i)%>%
+          mutate(module_1 = droplevels(module_1))
         multi_sub<-
           combined_pairwise_meaningful%>%
           filter(study_1==i)%>%
+          mutate(module_1 = droplevels(module_1))%>%
           ggplot(aes(y=-log10(p_hyper_adj), x=sorensen_index))+
           geom_point()+
           geom_hline(yintercept = -log10(0.05), color = "red", linetype = "dashed")+
           geom_vline(xintercept = 0.1, color = "red", linetype = "dashed")+
-          ggrepel::geom_text_repel(data = dplyr::select(plot_labels, -c(study, label))%>%distinct(),
+          ggrepel::geom_text_repel(data = dplyr::select(plot_labels_sub, -c(study, label))%>%distinct(),
                                    aes(label=module_2_label, x =sorensen_index , y = -log10(p_hyper_adj)),
                                    max.overlaps = Inf,
                                    min.segment.length = 0, segment.color = "black",
@@ -261,15 +263,17 @@ multi_plot_list<-list()
         multi_plot_list[[i]]<-multi_sub
         
         } else if (i %notin% plot_labels$study_1 & i %in% plot_labels$study_2){
-        plot_labels_sub<-filter(plot_labels, study_2==i)
+        plot_labels_sub<-filter(plot_labels, study_2==i)%>%
+          mutate(module_2 = droplevels(module_2))
         multi_sub<-
           combined_pairwise_meaningful%>%
           filter(study_2==i)%>%
+          mutate(module_2 = droplevels(module_2))%>%
           ggplot(aes(y=-log10(p_hyper_adj), x=sorensen_index))+
           geom_point()+
           geom_hline(yintercept = -log10(0.05), color = "red", linetype = "dashed")+
           geom_vline(xintercept = 0.1, color = "red", linetype = "dashed")+
-          ggrepel::geom_text_repel(data = dplyr::select(plot_labels, -c(study, label))%>%distinct(),
+          ggrepel::geom_text_repel(data = dplyr::select(plot_labels_sub, -c(study, label))%>%distinct(),
                                    aes(label=module_1_label, x =sorensen_index , y = -log10(p_hyper_adj)),
                                    max.overlaps = Inf,
                                    min.segment.length = 0, segment.color = "black",
