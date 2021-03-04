@@ -85,7 +85,7 @@ module_compareModules<-function(module_gene_sets, p.adjustment="bonferroni"){
   
   # remove redundant rows
   sorensen_sim_pairwise_meaningful = sorensen_sim_pairwise_meaningful[-delRows,]%>%
-    rename(sorensen_index = value)
+    dplyr::rename(sorensen_index = value)
   
   # Show distribution of similarities
   sorenson_boxplot<-
@@ -160,7 +160,7 @@ module_compareModules<-function(module_gene_sets, p.adjustment="bonferroni"){
   }
   # drop redundant rows & fdr correct
   phyper_pairwise_meaningful = phyper_pairwise_meaningful[-delRows,]%>%
-    rename(p_hyper = value)%>%
+    dplyr::rename(p_hyper = value)%>%
     mutate(p_hyper_adj=p.adjust(p_hyper, method = p.adjustment))
   
   # Show distribution of similarities
