@@ -663,7 +663,8 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
           mediation.models[[m]][[2]]%>%
             mutate(model = "outcome")%>%
             mutate(DV = outcome)%>%
-            mutate(isModelSingular = mediation.model.singularity[[m]][2]))
+            mutate(isModelSingular = mediation.model.singularity[[m]][2]))%>%
+        apply(2,as.character) # flatten lists
       
       mod.anovas.df<-
         mediation.anovas[[m]][[1]]%>%
@@ -674,7 +675,8 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
           mediation.anovas[[m]][[2]]%>%
             mutate(model = "outcome")%>%
             mutate(DV = outcome)%>%
-            mutate(isModelSingular = mediation.model.singularity[[m]][2]))
+            mutate(isModelSingular = mediation.model.singularity[[m]][2]))%>%
+        apply(2,as.character) # flatten lists
       
       # Save model info
       write.csv(mods.df, mod.filename)
@@ -698,10 +700,16 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
     
     for(p in 1:length(mediation.plots)){
       
-      ggsave(plot=mediation.plots[[p]][["forest.plot"]],
-        filename= paste(paste(plot.dir, "mediation_output_plots", sep="/"), gsub(" ","_", gsub("/","_", paste(names(mediation.plots[p]), 
-                                                                                                ".png", sep=""))), sep="/"),
-        dpi=300, height = plot.height, width = plot.width)
+      ggsave(plot=mediation.plots[[p]][["plot.forest"]],
+             filename= paste(paste(plot.dir, "mediation_output_plots", sep="/"), gsub(" ","_", gsub("/","_", paste(names(mediation.plots[p]), 
+                                                                                                                   "_forest.png", sep=""))), sep="/"),
+             dpi=300, height = plot.height, width = plot.width)
+      
+      ggsave(plot=mediation.plots[[p]][["plot.dens.ACME.ADE"]],
+             filename= paste(paste(plot.dir, "mediation_output_plots", sep="/"), gsub(" ","_", gsub("/","_", paste(names(mediation.plots[p]), 
+                                                                                                                   "_density.png", sep=""))), sep="/"),
+             dpi=300, height = plot.height, width = plot.width)
+      
     }
   }
 
