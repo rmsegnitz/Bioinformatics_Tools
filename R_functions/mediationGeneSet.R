@@ -337,7 +337,7 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
             ggplot(aes(x = estimate, color = group, linetype = effect))+
             geom_density(size=1)+
             geom_vline(xintercept = 0, linetype = "dashed")+
-            xlab("Avg. Causal Mediation Effect")+
+            xlab("Estimated Effect")+
             theme_bw()+
             theme(axis.text.y=element_blank(),
                   axis.ticks.y = element_blank(),
