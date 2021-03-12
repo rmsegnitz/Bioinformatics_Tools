@@ -329,6 +329,9 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
                   panel.grid.major = element_blank(),
                   panel.grid.minor = element_blank(),
                   panel.border = element_rect(colour = "black", fill=NA, size=1))
+          
+          if(!is.null(color.groups)){plot.ACME.dens<-plot.ACME.dens+scale_color_manual(values=color.groups)+scale_fill_manual(values=color.groups)}
+          
             
             
           plot.ACME.ADE.dens<-
@@ -346,6 +349,8 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
                   panel.grid.major = element_blank(),
                   panel.grid.minor = element_blank(),
                   panel.border = element_rect(colour = "black", fill=NA, size=1))
+          
+          if(!is.null(color.groups)){plot.ACME.ADE.dens<-plot.ACME.ADE.dens+scale_color_manual(values=color.groups)}
           
           # save plots
           mediation.plots[[
