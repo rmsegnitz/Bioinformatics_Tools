@@ -1,9 +1,57 @@
 
+# Testing of Module Coherence Across Datasets 
+# Author: Max Segnitz, msegnitz@uw.edu
+# Started January 2021
+#
+
+# © Richard M Segnitz 2020 (Adapted and expanded from code provided by Matt Altman)
+# License: This software is licensed under GNU General Public License, and may
+# be modified and/or redistributed under GNU GPL version 3 or later. License details
+# can be found in the accompanying this script, or at  (http://www.gnu.org/licenses/).
+#
+
+
+# DESCRIPTION:
+# Contains function to test the coherence of modules built from Dataset A in data from Dataset B.
+#
+# module_checkCoherence() calculates module expression values for the new dataset, generates within-module pairwise gene correlations,
+# and p values.
+# 
+# Outputs:  (subgene_correlation_df) a df of all inter-gene correlation values and p values, 
+#           (subgene_correlation_summary) a summary with median correlation values and p values for each module.
+#           (coherence_boxplot_cor) a ggplot of correlation values by module.
+#           (coherence_boxplot_p) a ggplot of correlation -log10(p) values by module
+#           (coherence_boxplot_combined) a combined plot with both correlation and p values. 
+
 #---------------------------
-# CHECK MODULE COHERENCE
+# 
 #--------------------------
 
-# Adapted from Matt Altman's code
+###############################
+#   module_checkCoherence()   #
+###############################
+
+# REQUIRED
+
+# module_gene_sets  = (dataframe) dataframe giving module membership. Should contain column "ensemblID" with ensembl IDs.
+# voom_obj = (voom object) voom object containign RNASeq dataset in which module coherence is to be tested.
+
+# OPTIONAL
+# geneSet (character string) = name of the column in module_gene_sets which defines modules. Defaults to "geneSet"
+# module_set (character string) = name the study from which modules were built. This is used simply for labeling of outputs. Default = "STUDY"
+# sample_set (character string) = name of the study from which the data come. This is used simply for labeling of outputs. Default = "STUDY"
+# remove_sets (vector) = a vector of character strings naming modules which you want removed from the analysis (eg. "0").
+
+
+# EXAMPLE USAGE
+
+# StudyA_in_StudyB_coherence<-
+#   module_checkCoherence(module_gene_sets = StudyA_mods, 
+#                         voom_obj = StudyB_voom, 
+#                         module_set = "StudyA", 
+#                         sample_set = "StudyB")
+
+########### DEFINE INPUTS ###############
 
 module_checkCoherence<-function(module_gene_sets, voom_obj, geneSet = "geneSet",module_set="STUDY", sample_set="STUDY", remove_sets = NULL){
 
