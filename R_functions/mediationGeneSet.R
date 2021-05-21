@@ -289,7 +289,7 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
                   panel.border = element_rect(colour = "black", fill=NA, size=1))  
           
           # combine plots into multipanel
-          plot3<- plot_grid(plot1, 
+          plot3<- cowplot::plot_grid(plot1, 
                             plot2 + theme(legend.position = "none"),
                             ncol=1, align = "v", axis="lr", rel_heights = c(2,1))
           
@@ -527,7 +527,7 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
                     panel.border = element_rect(colour = "black", fill=NA, size=1))  
             
             # combine plots in to multipanel
-            plot3<- plot_grid(plot1, 
+            plot3<- cowplot::plot_grid(plot1, 
                               plot2 + theme(legend.position = "none"),
                               ncol=1, align = "v", axis="lr", rel_heights = c(2,1))
             
