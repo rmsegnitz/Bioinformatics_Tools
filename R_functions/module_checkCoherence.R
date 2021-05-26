@@ -147,7 +147,14 @@ SubGeneCorDF_summary<-
   summarise(median_mod_correlation = median(Cor),
             median_mod_p = median(P))
 
-
+#Warning if 0 exist in p-values
+if(min(SubGeneCorDF$P) ==0){
+  print(paste(length(SubGeneCorDF$P[SubGeneCorDF$P==0]),
+               "p-values = 0. In plots, these will be replaced with the lowest non-zero value",
+               formatC(sort(unique(SubGeneCorDF$P))[2], digits=2, format="e")))
+}
+  
+  
 #Boxplot of all pairwise correlations per module
 coherence_boxplot_cor<-
 SubGeneCorDF%>%
