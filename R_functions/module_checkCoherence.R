@@ -41,6 +41,7 @@
 # module_set (character string) = name the study from which modules were built. This is used simply for labeling of outputs. Default = "STUDY"
 # sample_set (character string) = name of the study from which the data come. This is used simply for labeling of outputs. Default = "STUDY"
 # remove_sets (vector) = a vector of character strings naming modules which you want removed from the analysis (eg. "0").
+# return_plot (logical) - logical indicating whether plot should be printed when function runs. Defaults = TRUE.
 # R_cutoff (numeric) = a vector or single numeric value at which to draw red cutoff lines in correlation (R) plot. Default = 0.3
 # P_cutoff (numeric) = a vector or single numeric value at which to draw red cutoff lines in significance (P) plot. Default = 0.01
 
@@ -55,7 +56,14 @@
 
 ########### DEFINE INPUTS ###############
 
-module_checkCoherence<-function(module_gene_sets, voom_obj, geneSet = "geneSet",module_set="STUDY", sample_set="STUDY", remove_sets = NULL, R_cutoff = 0.3, P_cutoff = 0.01){
+module_checkCoherence<-function(module_gene_sets, 
+                                voom_obj, geneSet = "geneSet",
+                                module_set="STUDY", 
+                                sample_set="STUDY", 
+                                remove_sets = NULL,
+                                return_plot=TRUE,
+                                R_cutoff = 0.3, 
+                                P_cutoff = 0.01){
 
 # Load libraries
 require(gtools)
@@ -225,7 +233,7 @@ coherence_boxplot_faceted<-
   facet_wrap(~name, scales = "free_y", strip.position = "left", labeller = labeller(name = c("Cor" = "Correlation Strength", "negLogP" = "-log10(Correlation P Value)")))
 
 
-print(coherence_boxplot_faceted)
+if(return_plot){print(coherence_boxplot_faceted)}
 
 return(list(coherence_boxplot_combined = coherence_boxplot_faceted, 
             coherence_boxplot_cor = coherence_boxplot_cor, 
