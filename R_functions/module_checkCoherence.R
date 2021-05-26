@@ -135,7 +135,7 @@ for (i in uniGS){
 
 # Assemble and format results dataframe
 SubGeneCorDF<-as.data.frame(SubGeneCorDF)%>%
-  rename(Cor = allCorVals, P = allPVals, Set = V3)%>%
+  dplyr::rename(Cor = allCorVals, P = allPVals, Set = V3)%>%
   mutate(Cor = as.numeric(as.character(Cor)))%>%
   mutate(P = as.numeric(as.character(P)))%>%
   mutate(Set = factor(Set, levels =uniGS))%>%
