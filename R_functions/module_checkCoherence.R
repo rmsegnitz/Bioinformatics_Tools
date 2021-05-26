@@ -97,7 +97,7 @@ print(paste0(length(unique(unlist(GSabsent))), " Module Genes absent in voom obj
 # Correlation p value function 
 cor2pvalue = function(r, n) {
   t <- (r*sqrt(n-2))/sqrt(1-r^2)
-  p <- 2*(1 - pt(abs(t),(n-2)))
+  p <- 2*pt(abs(t),(n-2), lower.tail=FALSE)
   se <- sqrt((1-r*r)/(n-2))
   out <- list(r, n, t, p, se)
   names(out) <- c("r", "n", "t", "p", "se")
@@ -172,7 +172,8 @@ labels_df_P<-data.frame(name=rep("negLogP", length(P_cutoff)),
   
 coherence_boxplot_p<-
   SubGeneCorDF%>%
-  ggplot(aes(y=-log10(P), x=Set))+
+  mutate(P.est = ifelse(P==0, sort(unique(SubGeneCorDF$P))[2], P)) %>% #Fill in true 0 with lowest P-value in dataset
+  ggplot(aes(y=-log10(P.est), x=Set))+
   geom_hline(yintercept =0, color="black")+
   geom_boxplot(outlier.shape = NA)+
   geom_hline(yintercept = -log10(P_cutoff), color="red", linetype="dashed")+
@@ -195,6 +196,7 @@ labels_df<-data.frame(name=c(rep("Cor", length(R_cutoff)), rep("negLogP", length
 
 coherence_boxplot_faceted<-
   SubGeneCorDF%>%
+  mutate(P.est = ifelse(P==0, sort(unique(SubGeneCorDF$P))[2], P)) %>% #Fill in true 0 with lowest P-value in dataset
   mutate(negLogP = -log10(P))%>%
   pivot_longer(cols = c(Cor, negLogP))%>%
   ggplot(aes(y=value, x=Set))+
