@@ -197,7 +197,7 @@ labels_df<-data.frame(name=c(rep("Cor", length(R_cutoff)), rep("negLogP", length
 coherence_boxplot_faceted<-
   SubGeneCorDF%>%
   mutate(P.est = ifelse(P==0, sort(unique(SubGeneCorDF$P))[2], P)) %>% #Fill in true 0 with lowest P-value in dataset
-  mutate(negLogP = -log10(P))%>%
+  mutate(negLogP = -log10(P.est))%>%
   pivot_longer(cols = c(Cor, negLogP))%>%
   ggplot(aes(y=value, x=Set))+
   geom_hline(yintercept =0, color="black")+
