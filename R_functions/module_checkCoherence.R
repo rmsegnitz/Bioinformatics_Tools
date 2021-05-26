@@ -41,7 +41,8 @@
 # module_set (character string) = name the study from which modules were built. This is used simply for labeling of outputs. Default = "STUDY"
 # sample_set (character string) = name of the study from which the data come. This is used simply for labeling of outputs. Default = "STUDY"
 # remove_sets (vector) = a vector of character strings naming modules which you want removed from the analysis (eg. "0").
-
+# R_cutoff (numeric) = a vector or single numeric value at which to draw red cutoff lines in correlation (R) plot. Default = 0.3
+# P_cutoff (numeric) = a vector or single numeric value at which to draw red cutoff lines in significance (P) plot. Default = 0.01
 
 # EXAMPLE USAGE
 
@@ -49,11 +50,12 @@
 #   module_checkCoherence(module_gene_sets = StudyA_mods, 
 #                         voom_obj = StudyB_voom, 
 #                         module_set = "StudyA", 
-#                         sample_set = "StudyB")
+#                         sample_set = "StudyB",
+#                         R_cutoff = 0.3, P_cutoff = 0.01)
 
 ########### DEFINE INPUTS ###############
 
-module_checkCoherence<-function(module_gene_sets, voom_obj, geneSet = "geneSet",module_set="STUDY", sample_set="STUDY", remove_sets = NULL){
+module_checkCoherence<-function(module_gene_sets, voom_obj, geneSet = "geneSet",module_set="STUDY", sample_set="STUDY", remove_sets = NULL, R_cutoff = 0.3, P_cutoff = 0.01){
 
 # Load libraries
 require(gtools)
@@ -95,7 +97,7 @@ print(paste0(length(unique(unlist(GSabsent))), " Module Genes absent in voom obj
 # Correlation p value function 
 cor2pvalue = function(r, n) {
   t <- (r*sqrt(n-2))/sqrt(1-r^2)
-  p <- 2*(1 - pt(abs(t),(n-2)))
+  p <- 2*pt(abs(t),(n-2), lower.tail=FALSE)
   se <- sqrt((1-r*r)/(n-2))
   out <- list(r, n, t, p, se)
   names(out) <- c("r", "n", "t", "p", "se")
@@ -145,15 +147,22 @@ SubGeneCorDF_summary<-
   summarise(median_mod_correlation = median(Cor),
             median_mod_p = median(P))
 
-
+#Warning if 0 exist in p-values
+if(min(SubGeneCorDF$P) ==0){
+  print(paste(length(SubGeneCorDF$P[SubGeneCorDF$P==0]),
+               "p-values = 0. In plots, these will be replaced with the lowest non-zero value",
+               formatC(sort(unique(SubGeneCorDF$P))[2], digits=2, format="e")))
+}
+  
+  
 #Boxplot of all pairwise correlations per module
 coherence_boxplot_cor<-
 SubGeneCorDF%>%
   ggplot(aes(y=Cor, x=Set))+
   geom_hline(yintercept =0, color="black")+
   geom_boxplot(outlier.shape = NA)+
-  geom_hline(yintercept = 0.3, linetype = "dashed", color = "red")+
-  scale_y_continuous(breaks=seq(0,1,0.2))+
+  geom_hline(yintercept = R_cutoff, linetype = "dashed", color = "red")+
+  scale_y_continuous(breaks=c(seq(-1,1,0.2), R_cutoff))+
   ylab("Correlation Strength")+
   xlab(paste0(module_set, " Modules"))+
   labs(title = paste0(module_set, " Module Coherence in ", sample_set, " Samples"),
@@ -163,14 +172,19 @@ SubGeneCorDF%>%
         panel.grid.major.x = element_blank(), 
         plot.title = element_text(hjust=0.5), 
         plot.subtitle = element_text(hjust=0.5))
-
+  
+labels_df_P<-data.frame(name=rep("negLogP", length(P_cutoff)),
+                        h_pos = -log10(P_cutoff)-0.2,
+                        h_label = paste("p=",P_cutoff,sep=""))
+  
 coherence_boxplot_p<-
   SubGeneCorDF%>%
-  ggplot(aes(y=-log10(P), x=Set))+
+  mutate(P.est = ifelse(P==0, sort(unique(SubGeneCorDF$P))[2], P)) %>% #Fill in true 0 with lowest P-value in dataset
+  ggplot(aes(y=-log10(P.est), x=Set))+
   geom_hline(yintercept =0, color="black")+
   geom_boxplot(outlier.shape = NA)+
-  geom_hline(yintercept = -log10(0.05), color="red", linetype="dashed")+
-  geom_hline(yintercept = -log10(0.01), color="red", linetype="dashed")+
+  geom_hline(yintercept = -log10(P_cutoff), color="red", linetype="dashed")+
+  geom_text(data=labels_df_P, aes(label = h_label, x=3, y=h_pos), color="red")+
   ylab("-log10(Correlation P Value)")+
   xlab(paste0(module_set, " Modules"))+
   labs(title = paste0(module_set, " Module Coherence in ", sample_set, " Samples"),
@@ -182,18 +196,20 @@ coherence_boxplot_p<-
         plot.subtitle = element_text(hjust=0.5))
 
 # Or with facets
-labels_df<-data.frame(name=c("Cor", "negLogP"), 
-                      h_pos = c(0.17, 1.7), h_label= c("r=0.2", "p=0.01"))
+labels_df<-data.frame(name=c(rep("Cor", length(R_cutoff)), rep("negLogP", length(P_cutoff))),
+                        h_line = c(R_cutoff, -log10(P_cutoff)),
+                        h_pos = c(R_cutoff-0.02, -log10(P_cutoff)-0.2),
+                        h_label = c(paste("r=",R_cutoff,sep=""), paste("p=",P_cutoff,sep="")))
 
 coherence_boxplot_faceted<-
   SubGeneCorDF%>%
-  mutate(negLogP = -log10(P))%>%
+  mutate(P.est = ifelse(P==0, sort(unique(SubGeneCorDF$P))[2], P)) %>% #Fill in true 0 with lowest P-value in dataset
+  mutate(negLogP = -log10(P.est))%>%
   pivot_longer(cols = c(Cor, negLogP))%>%
-  mutate(h_line = ifelse(name == "negLogP", -log10(0.01), 0.2))%>%
   ggplot(aes(y=value, x=Set))+
   geom_hline(yintercept =0, color="black")+
   geom_boxplot(outlier.shape = NA)+
-  geom_hline(aes(yintercept = h_line), color = "red", linetype="dashed")+
+  geom_hline(data=labels_df, aes(yintercept = h_line), color = "red", linetype="dashed")+
   geom_text(data=labels_df, aes(label = h_label, x=3, y=h_pos), color="red")+
   xlab(paste0(module_set, " Modules"))+
   labs(title = paste0(module_set, " Module Coherence in ", sample_set, " Samples"),
