@@ -67,11 +67,12 @@ function (model, pred, modx, vmat = NULL, alpha = 0.05, plot = TRUE,
   # Check nature of predictor
   pred_class<-
     case_when(model.frame(model)[, pred]%>%is.numeric() ~ "numeric",
-              model.frame(model)[, pred]%>%is.character() ~ "categorical")
+              model.frame(model)[, pred]%>%is.character() ~ "categorical", 
+              model.frame(model)[, pred]%>%is.factor() ~ "categorical")
   
   # Define coef term if categorical
   if(pred_class=="categorical"){
-    pred_term = names(as.list(coefs))[grep(pred, names(as.list(coefs)))[1]]}
+    pred_term = names(as.list(get_coef(model)))[grep(pred, names(as.list(get_coef(model))))[1]]}
   
   # Check whether any categorical predictors are limited to 2 groups
   if(pred_class=="categorical"){
@@ -83,7 +84,7 @@ function (model, pred, modx, vmat = NULL, alpha = 0.05, plot = TRUE,
   # Edit: find interaction term for categorical predictor
 
   intterm1 = case_when(pred_class=="numeric" ~ paste(pred, ":", modx, sep = ""),
-                       pred_class=="categorical" ~ paste(names(as.list(coefs))[grep(pred, names(as.list(coefs)))][1], 
+                       pred_class=="categorical" ~ paste(names(as.list(get_coef(model)))[grep(pred, names(as.list(get_coef(model))))][1], 
                                                          modx, sep=":"))
   
   intterm1tf <- any(intterm1 %in% names(get_coef(model)))
@@ -91,7 +92,7 @@ function (model, pred, modx, vmat = NULL, alpha = 0.05, plot = TRUE,
   # Edit: find interaction term for categorical predictor
   
   intterm2 = case_when(pred_class == "numeric" ~ paste(modx, ":", pred, sep = ""),
-                       pred_class == "categorical" ~ paste(modx, names(as.list(coefs))[grep(pred, names(as.list(coefs)))][1] 
+                       pred_class == "categorical" ~ paste(modx, names(as.list(get_coef(model)))[grep(pred, names(as.list(get_coef(model))))][1] 
                                                            , sep=":"))
 
   intterm2tf <- any(intterm2 %in% names(get_coef(model)))
