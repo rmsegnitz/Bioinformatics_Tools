@@ -24,6 +24,9 @@ function (model, pred, modx, vmat = NULL, alpha = 0.05, plot = TRUE,
           sig.color = "#00BFC4", insig.color = "#F8766D", mod.range = NULL, 
           title = "Johnson-Neyman plot") 
 {
+  
+  require(jtools)
+  
   pred <- quo_name(enexpr(pred))
   if (make.names(pred) != pred) 
     pred <- bt(pred)
