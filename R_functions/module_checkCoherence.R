@@ -71,7 +71,17 @@ require(tidyverse)
 `%notin%`<-Negate(`%in%`)
   
 moduleSets<- module_gene_sets
-voomData<-voom_obj
+
+if(all(class(voom_obj)=="EList")){
+  voomType = "voom_object"
+  voomData<-voom_obj
+  } else if(all(class(dat.voom$E)==c("matrix", "array"))){
+  voomType = "count_matrix"
+  voomData<-list()
+  voomData$E<-voom_obj
+  voomData<- new("EList", voomData)
+} else {stop("voomobj must either by an EList class voom object, or a matrix from a voom object.")}
+
 
 #-----------------------------  
 # Calculate the gene set means (module expression)
@@ -93,6 +103,7 @@ for (i in uniGS){
   else
     GSsub<-rbind(GSsub, voomData$E[matchIndex,])
 }
+
 rownames(GSsub)<-uniGS
 
 if(length(unlist(GSabsent))>0){
