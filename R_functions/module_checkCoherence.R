@@ -128,7 +128,7 @@ cor2pvalue = function(r, n) {
 if(!is.null(remove_sets)){uniGS<-uniGS[-which(uniGS %in% remove_sets)]}
 
 # Setup storage
-SubGeneCorDF<-c()
+SubGeneCorDF<-list()
 SubGeneCorMedian<-c()
 SubGenePMedian<-c()
 
@@ -145,7 +145,7 @@ for (i in uniGS){
   allCorInfo<-cor2pvalue(setCor, n)
   setP<-allCorInfo$p
 
-  SubGeneCorDF<- # Assemble df of gene pairs, correlations, and p values
+  SubGeneCorDF[[i]]<- # Assemble df of gene pairs, correlations, and p values
     data.frame(t(combn(colnames(setCor), 2)), 
                allCorVals=setCor[t(combn(colnames(setCor), 2))],
                allPVals = setP[t(combn(colnames(setP), 2))])%>%
@@ -155,7 +155,8 @@ for (i in uniGS){
 
 
 # Assemble and format results dataframe
-SubGeneCorDF<-as.data.frame(SubGeneCorDF)%>%
+SubGeneCorDF<-
+  bind_rows(SubGeneCorDF)%>%
   dplyr::rename(Cor = allCorVals, P = allPVals, Set = V3)%>%
   mutate(Cor = as.numeric(as.character(Cor)))%>%
   mutate(P = as.numeric(as.character(P)))%>%
