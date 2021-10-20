@@ -144,12 +144,14 @@ for (i in uniGS){
   
   allCorInfo<-cor2pvalue(setCor, n)
   setP<-allCorInfo$p
-  allCorVals<-setCor[upper.tri(setCor)] # Extract upper triangle correlation values
-  allPVals<-setP[upper.tri(setP)] # Extract upper triangle correlation p values
-  
-  SubGeneCorDF<-rbind(SubGeneCorDF, cbind(allCorVals, allPVals, rep(curSet, length(allCorVals))))
-}
 
+  SubGeneCorDF<- # Assemble df of gene pairs, correlations, and p values
+    data.frame(t(combn(colnames(setCor), 2)), 
+               allCorVals=setCor[t(combn(colnames(setCor), 2))],
+               allPVals = setP[t(combn(colnames(setP), 2))])%>%
+    dplyr::rename(gene1 = X1, gene2 = X2)%>%
+    mutate(V3=i)
+}
 
 
 # Assemble and format results dataframe
@@ -158,7 +160,8 @@ SubGeneCorDF<-as.data.frame(SubGeneCorDF)%>%
   mutate(Cor = as.numeric(as.character(Cor)))%>%
   mutate(P = as.numeric(as.character(P)))%>%
   mutate(Set = factor(Set, levels =uniGS))%>%
-  dplyr::select(Set, Cor, P)
+  dplyr::select(Set, gene1, gene2, Cor, P)
+
 
 SubGeneCorDF_summary<-
   SubGeneCorDF%>%
