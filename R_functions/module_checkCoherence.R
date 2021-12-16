@@ -250,7 +250,15 @@ coherence_boxplot_faceted<-
 
 if(return_plot){print(coherence_boxplot_faceted)}
 
-return(list(coherence_boxplot_combined = coherence_boxplot_faceted, 
+if(length(unlist(GSabsent))>0){
+  return(list(coherence_boxplot_combined = coherence_boxplot_faceted, 
+              coherence_boxplot_cor = coherence_boxplot_cor, 
+              coherence_boxplot_p = coherence_boxplot_p,  
+              subgene_correlation_df = SubGeneCorDF,
+              subgene_correlation_summary = SubGeneCorDF_summary, 
+              GSabsent = GSabsent))} else 
+  
+  return(list(coherence_boxplot_combined = coherence_boxplot_faceted, 
             coherence_boxplot_cor = coherence_boxplot_cor, 
             coherence_boxplot_p = coherence_boxplot_p,  
             subgene_correlation_df = SubGeneCorDF,
