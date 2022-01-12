@@ -158,7 +158,7 @@ geneP_FDR_plot<-
 #---------------------------------------------------
 # Define Plotting scale for expression if necessary
 #---------------------------------------------------
-if(expression_gw){
+if(gw_expression){
   
   # Determine expression limits & breaks
   exp_range<-
