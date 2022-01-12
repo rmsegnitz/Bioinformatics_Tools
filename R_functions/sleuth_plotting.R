@@ -29,11 +29,12 @@
 # OPTIONAL
 # palette = (vector, character) A user provided palette for plotting transcripts. Defaults to NULL & auto generates a palette.
 # sig = (numeric) P value threshold at which to color transcripts. Defaults to NULL & automatically determines a pval threshold that maintains plotting colors <=6.
+# gw_expression = (logical) indicate whether the expression scale should be set  across all results (as opposed to within the gene). default = F
 
 ########### DEFINE INPUTS ###############
 
 plot_sleuth_res_geneTx<-
-  function(tx_results, gene_results, gene, palette = NULL, sig = NULL){
+  function(tx_results, gene_results, gene, palette = NULL, sig = NULL, gw_expression=F){
 
 require(ggthemes)
 
@@ -121,6 +122,7 @@ tx_plot<-
   geom_point(aes(size=mean_obs, shape=stim),alpha=0.5 ,position=position_dodge(width=0.25))+
   scale_shape_manual(values = c("MEDIA" = 1, "TB" = 16))+
   scale_color_manual(values = plot_palette)+
+  scale_size_area()+
   ylab("Bias Adjusted Fold Change (b)")+
   xlab("-log10(Tx Pval)")+
   labs(shape = " ", color = "Transcript", size = "Mean Normalized \nExpression")+
@@ -152,6 +154,31 @@ geneP_FDR_plot<-
   labs(shape="")+
   theme_bw()+
   theme(panel.grid = element_blank(), axis.ticks.y = element_blank())
+
+#---------------------------------------------------
+# Define Plotting scale for expression if necessary
+#---------------------------------------------------
+if(expression_gw){
+  
+  # Determine expression limits & breaks
+  exp_range<-
+    range(filter(tx_results, ext_gene %in% plotting_genes_of_interest_clean)$mean_obs)
+  
+  exp_range_plot_breaks<-
+    c(floor(floor(exp_range[1]*10)/5)*0.5, 
+      floor(floor((exp_range[1] + diff(exp_range)/3)*10)/5)*0.5,
+      floor(floor((exp_range[1] + 2*diff(exp_range)/3)*10)/5)*0.5,
+      floor(ceiling(exp_range[2]*10)/5)*0.5)
+  
+  tx_plot<-
+    tx_plot+
+    scale_size_area(limits = range(exp_range_plot_breaks), breaks=exp_range_plot_breaks)
+  
+}
+
+
+
+# Assemble multipanel
 
 plot_layout <-"
 AAAA#
