@@ -61,6 +61,8 @@ for(i in c(0.05, 0.045,0.04, 0.035,  0.03, 0.025, 0.02, 0.015, 0.01, 0.001)){
 sig<-as.numeric(names(p_threshold_eval[which(p_threshold_eval<=6)][1]))
 }
 
+if(is.na(sig)){stop("No sensible p threshold determined. Please provide p threshold (likely lower than 0.001)")}
+
 non_sig_label<-paste0("no p<", sig)
 
 res_tx_sub<-
