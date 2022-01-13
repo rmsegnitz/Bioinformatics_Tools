@@ -66,12 +66,23 @@ if(is.na(sig)){stop("No sensible p threshold determined. Please provide p thresh
 
 non_sig_label<-paste0("no p<", sig)
 
+# Assign color codings to significant transcripts
 res_tx_sub<-
   res_tx_sub%>%
   group_by(transcript_name)%>% # group by Tx
-  mutate(tx_color_code = ifelse(min(pval)< sig, transcript_name, non_sig_label))%>%  # code as non-significant if no pval<0.05
-  ungroup()%>% # ungroup before ordering color codes
-  mutate(tx_color_code = factor(tx_color_code, levels = c(non_sig_label, gtools::mixedsort(unique(.$tx_color_code)[-grep(non_sig_label, unique(.$tx_color_code))], decreasing = T)))) # Order color coding smartly
+  mutate(tx_color_code = ifelse(min(pval) < sig, transcript_name, non_sig_label))%>%  # code as non-significant if no pval<0.05
+  ungroup() # ungroup before ordering color codes
+
+if(non_sig_label %in% res_tx_sub$tx_color_code){
+  res_tx_sub<-
+    res_tx_sub%>%
+    mutate(tx_color_code = factor(tx_color_code, levels = c(non_sig_label, gtools::mixedsort(unique(.$tx_color_code)[-grep(non_sig_label, unique(.$tx_color_code))], decreasing = T)))) # Order color coding smartly
+} else {
+  res_tx_sub<-
+    res_tx_sub%>%
+    mutate(tx_color_code = factor(tx_color_code, levels = gtools::mixedsort(unique(.$tx_color_code), decreasing = T)))
+}
+
 
 res_gene_sub<-
   gene_results%>%
@@ -88,7 +99,7 @@ if(is.null(palette)){
   if(length(unique(res_tx_sub$tx_color_code))<=7){
     
     plot_palette<-c("grey", colorblind_pal()(8)[-1]) # Generate color-blind friendly palette
-    names(plot_palette) <- c(non_sig_label, as.character(unique(res_tx_sub$tx_color_code))[-grep(non_sig_label, unique(res_tx_sub$tx_color_code))]) # assign tx names to palette
+    names(plot_palette) <- c(non_sig_label, as.character(unique(res_tx_sub$tx_color_code))[which(!grepl(non_sig_label, unique(res_tx_sub$tx_color_code)))]) # assign tx names to palette
     plot_palette<-plot_palette[-which(is.na(names(plot_palette)))] # drop unused colors
     
   } else stop(paste0("The number of transcripts with significant (p<0.05) results exceeds the default plotting palette (6 + grey/non-significant). Please provide a palette with at least ", length(unique(res_tx_sub$tx_color_code)), " colors, or provide a lower pvalue threshold for coloring transcripts."))
