@@ -75,7 +75,7 @@ moduleSets<- module_gene_sets
 if(all(class(voom_obj)=="EList")){
   voomType = "voom_object"
   voomData<-voom_obj
-  } else if(all(class(dat.voom$E)==c("matrix", "array"))){
+  } else if(all(class(voom_obj)==c("matrix", "array"))){
   voomType = "count_matrix"
   voomData<-list()
   voomData$E<-voom_obj
