@@ -1,5 +1,3 @@
-sig_gg_network_manual_pies<- # overwrite with deep copy & reorder layers
-  unserialize(serialize(move_layers(sig_gg_network_manual_pies, "GeomTextRepel", position = "top"), NULL))
 
 #### Deep save ggplot objects to overwrite without conflict ####
 
