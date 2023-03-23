@@ -71,37 +71,32 @@ require(tidyverse)
 `%notin%`<-Negate(`%in%`)
   
 moduleSets<- module_gene_sets
+if(class(voom_obj)[1]== "EList"){voomData<-voom_obj$E}else{voomData<-voom_obj}
 
-if(all(class(voom_obj)=="EList")){
-  voomType = "voom_object"
-  voomData<-voom_obj
-  } else if(all(class(voom_obj)==c("matrix", "array"))){
-  voomType = "count_matrix"
-  voomData<-list()
-  voomData$E<-voom_obj
-  voomData<- new("EList", voomData)
-} else {stop("voomobj must either by an EList class voom object, or a matrix from a voom object.")}
 
 
 #-----------------------------  
 # Calculate the gene set means (module expression)
 #-----------------------------
-uniGS<-moduleSets$geneSet%>%unique()%>%as.character()%>%mixedsort() # Pull unique modules & order correctly
+uniGS<-moduleSets%>%
+  pull(get(geneSet))%>%
+  unique()%>%as.character()%>%mixedsort() # Pull unique modules & order correctly
 
 GSsub<-c()
 GSabsent<-list()
 
 for (i in uniGS){
   curGS<-i
-  curIDs<-as.character(moduleSets$ensemblID[which(moduleSets$geneSet==curGS)])
+  curIDs<-as.character(moduleSets$ensemblID[which(pull(moduleSets, geneSet)==curGS)])
+  
   matchIndex<-match(curIDs, rownames(voomData))
   if (any(is.na(matchIndex)))
     matchIndex<-matchIndex[-which(is.na(matchIndex))]
     GSabsent[[i]]<-curIDs[which(curIDs %notin% rownames(voomData))]
   if (length(curIDs) > 1)
-    GSsub<-rbind(GSsub, apply(voomData$E[matchIndex,], 2, mean))
+    GSsub<-rbind(GSsub, apply(voomData[matchIndex,], 2, mean))
   else
-    GSsub<-rbind(GSsub, voomData$E[matchIndex,])
+    GSsub<-rbind(GSsub, voomData[matchIndex,])
 }
 
 rownames(GSsub)<-uniGS
@@ -134,13 +129,13 @@ SubGenePMedian<-c()
 
 for (i in uniGS){
   curSet<-i
-  curIDs<-as.character(moduleSets$ensemblID[which(moduleSets$geneSet==curSet)])
+  curIDs<-as.character(moduleSets$ensemblID[which(pull(moduleSets, geneSet)==curSet)])
   matchIndex<-match(curIDs, rownames(voomData))
   if (any(is.na(matchIndex))){
     matchIndex<-matchIndex[-which(is.na(matchIndex))]}
   
-  setCor<-cor(t(voomData$E[matchIndex,])) # Calculate pairwise gene correlations from expression data
-  n<-t(!is.na(t(voomData$E[matchIndex,]))) %*% (!is.na(t(voomData$E[matchIndex,]))) # create matrix with sample size to calculate correlation p (dim=curIDs*curIDs, value = sample size)
+  setCor<-cor(t(voomData[matchIndex,])) # Calculate pairwise gene correlations from expression data
+  n<-t(!is.na(t(voomData[matchIndex,]))) %*% (!is.na(t(voomData[matchIndex,]))) # create matrix with sample size to calculate correlation p (dim=curIDs*curIDs, value = sample size)
   
   allCorInfo<-cor2pvalue(setCor, n)
   setP<-allCorInfo$p
