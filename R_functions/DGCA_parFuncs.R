@@ -1,10 +1,34 @@
-# Rewrite DGCA functions to impliment parallelization of permuations.
+
+# Implimentation of parallel processing within core DGCA functions.
+# Author: Max Segnitz, msegnitz@uw.edu
+# Modified from DGCA  
+# Zhang B, McKenzie A (2023). _DGCA: Differential Gene Correlation Analysis_. R package version 1.0.3, <https://CRAN.R-project.org/package=DGCA>.
+
+# Started October 2023
+#
+
+# © Richard M Segnitz 2023 (modified from DGCA)
+# License: This software is licensed under GNU General Public License, and may
+# be modified and/or redistributed under GNU GPL version 3 or later. License details
+# can be found in the accompanying this script, or at  (http://www.gnu.org/licenses/).
+#
+
+
+# DESCRIPTION:
+# This script and the functions within attempt to accomplish several key aims. 
+# 1) Improve the efficiency of calculations made within DGCA, especially when permutations are run.
+# 2) Allow the user to return gene-level results used for calculating module-level statistics. 
+#   This reduces redundancy and ensures that any permutation based statistics are calculated from 
+#    same randomizations of the data.
+#
+
+
 
 moduleDC_par<-
   function (inputMat, design, compare, genes, labels, corr_cutoff = 0.99, 
             signType = "none", corrType = "pearson", nPerms = 50, oneSidedPVal = FALSE, 
             gene_avg_signif = 0.05, number_DC_genes = 3, dCorAvgMethod = "median", num_cores=4,
-            save_gene_level=F) {
+            save_gene_level=F, seed=NULL) {
     
     require(DGCA)
     
@@ -30,6 +54,7 @@ moduleDC_par<-
         next
       module_size[i] = length(genes_tmp)
       inputMat_tmp = inputMat[genes_tmp, ]
+      if(!is.null(seed)){set.seed(null)} # set random seed if provided.
       ddcor_res = suppressWarnings(
         ddcorAll_par(inputMat = inputMat_tmp, 
                                design = design, 
@@ -47,8 +72,7 @@ moduleDC_par<-
       mdc_vector[i] = ddcor_res[["total_avg_dcor"]][["total_zdiff"]]
       mdc_signif[i] = ddcor_res[["total_avg_dcor"]][["pVal"]]
       gene_avg = ddcor_res[["gene_avg_dcor"]]
-      gene_avg_sig = gene_avg[gene_avg$pVal_adj < gene_avg_signif, 
-      ]
+      gene_avg_sig = gene_avg[gene_avg$pVal_adj < gene_avg_signif, ]
       gene_avg_goc = head(gene_avg_sig[gene_avg_sig$avgZDiff > 
                                          0, ]$Gene, number_DC_genes)
       gene_avg_loc = head(gene_avg_sig[gene_avg_sig$avgZDiff < 
@@ -57,18 +81,24 @@ moduleDC_par<-
       loc_genes[i] = paste(gene_avg_loc, collapse = ", ")
       
       if(save_gene_level){
+      
+        if(dCorAvgMethod == "median"){ddcor_res$gene_avg_dcor<-dplyr::rename(ddcor_res$gene_avg_dcor, medianZDiff=avgZDiff)}
+        
       dcPair_byMod[[labels_names[i]]]<-  dplyr::mutate(ddcor_res$dcPair, module=labels_names[i], contrast_ref=compare[1], contrast_lvl=compare[2])
       dcGeneAvg_byMod[[labels_names[i]]]<-  dplyr::mutate(ddcor_res$gene_avg_dcor, module=labels_names[i], contrast_ref=compare[1], contrast_lvl=compare[2])
+      
+      
       }
       
     }
     res_df = data.frame(Module = labels_names, Size = module_size, 
                         MeDC = mdc_vector, pVal = mdc_signif, Top_GOC = goc_genes, 
                         Top_LOC = loc_genes)
+    
     if(save_gene_level){
       return(list(moduleResults=res_df, dcPair_byMod=dcPair_byMod, dcGeneAvg_byMod=dcGeneAvg_byMod))
     }else{
-    return(res_df)}
+    return(moduleResults=res_dfres_df)}
   }
 
 
@@ -325,8 +355,6 @@ function (zDiff, zDiffPerm, dCorAvgType, oneSidedPVal = FALSE,
        avg_dcor_df = avg_dcor_df[order(abs(avg_dcor_df$avgZDiff), 
                                     decreasing = TRUE), ]
        
-    if(dCorAvgMethod == "median"){avg_dcor_df<-dplyr::rename(avg_dcor_df, medianZDiff=avgZDiff)}
- 
     
     return(avg_dcor_df)
   }
