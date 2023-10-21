@@ -28,7 +28,7 @@ moduleDC_par<-
   function (inputMat, design, compare, genes, labels, corr_cutoff = 0.99, 
             signType = "none", corrType = "pearson", nPerms = 50, oneSidedPVal = FALSE, 
             gene_avg_signif = 0.05, number_DC_genes = 3, dCorAvgMethod = "median", num_cores=4,
-            save_gene_level=F, seed=NULL) {
+            save_gene_level=F, seed=NULL, out.dir=NULL) {
     
     require(DGCA)
     
@@ -80,25 +80,47 @@ moduleDC_par<-
       goc_genes[i] = paste(gene_avg_goc, collapse = ", ")
       loc_genes[i] = paste(gene_avg_loc, collapse = ", ")
       
-      if(save_gene_level){
+       if(save_gene_level){
       
         if(dCorAvgMethod == "median"){ddcor_res$gene_avg_dcor<-dplyr::rename(ddcor_res$gene_avg_dcor, medianZDiff=avgZDiff)}
         
-      dcPair_byMod[[labels_names[i]]]<-  dplyr::mutate(ddcor_res$dcPair, module=labels_names[i], contrast_ref=compare[1], contrast_lvl=compare[2])
-      dcGeneAvg_byMod[[labels_names[i]]]<-  dplyr::mutate(ddcor_res$gene_avg_dcor, module=labels_names[i], contrast_ref=compare[1], contrast_lvl=compare[2])
+      dcPair_byMod[[labels_names[i]]]<-  
+        dplyr::mutate(ddcor_res$dcPair, 
+                      module=labels_names[i], 
+                      contrast_ref=compare[1], 
+                      contrast_lvl=compare[2], 
+                      n_perm=nPerms)
+      dcGeneAvg_byMod[[labels_names[i]]]<-  
+        dplyr::mutate(ddcor_res$gene_avg_dcor, 
+                      module=labels_names[i], 
+                      contrast_ref=compare[1], 
+                      contrast_lvl=compare[2],
+                      n_perm=nPerms)
       
+       }
       
-      }
+     
+      
       
     }
     res_df = data.frame(Module = labels_names, Size = module_size, 
                         MeDC = mdc_vector, pVal = mdc_signif, Top_GOC = goc_genes, 
-                        Top_LOC = loc_genes)
+                        Top_LOC = loc_genes, n_perm=nPerms)
     
     if(save_gene_level){
-      return(list(moduleResults=res_df, dcPair_byMod=dcPair_byMod, dcGeneAvg_byMod=dcGeneAvg_byMod))
-    }else{
-    return(moduleResults=res_dfres_df)}
+      
+      if(save_gene_level & is.null(out.dir)){
+        print("If saving gene level results, it is recommended to provide output directory. Proceed with Caution.")
+        return(list(moduleResults=res_df, dcPair_byMod=dcPair_byMod, dcGeneAvg_byMod=dcGeneAvg_byMod))
+      } else if (save_gene_level & !is.null(out.dir)){
+        dir.create(paste(out.dir, "gene_level_results", sep="/"))
+        saveRDS(dcPair_byMod, paste(out.dir, "gene_level_results", paste0("pairwise_DCor_withinModule_",  paste(compare, collapse="_") ,".rds") ,sep="/"))
+        write.csv(dplyr::bind_rows(dcGeneAvg_byMod, .id="module"),
+                  paste(out.dir, "gene_level_results", paste0("geneSummary_DCor_withinModule_",  paste(compare, collapse="_") ,".csv") ,sep="/"))
+        write.csv(res_df, paste(out.dir, paste0("moduleDGCA_",  paste(compare, collapse="_") ,".csv"), sep="/"))
+        return(moduleResults=res_df)}
+      }else{
+    return(moduleResults=res_df)}
   }
 
 
