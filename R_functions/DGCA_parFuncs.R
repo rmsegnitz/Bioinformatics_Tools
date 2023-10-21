@@ -177,7 +177,7 @@ ddcorAll_par<- function(inputMat, design, compare, inputMatB = NULL, splitSet = 
                                compare = compare, inputMatB = inputMatB, impute = impute, 
                                corrType = corrType, nPerms = nPerms, corr_cutoff = corr_cutoff, 
                                signType = signType, num_cores=num_cores)
-      close(pb)
+
     }
     if (adjust != "perm") {
       ddcor_table = dcTopPairs(dcObject = ddcor_res, nPairs = nPairs, 
