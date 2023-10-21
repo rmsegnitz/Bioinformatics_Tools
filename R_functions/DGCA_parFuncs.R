@@ -54,7 +54,7 @@ moduleDC_par<-
         next
       module_size[i] = length(genes_tmp)
       inputMat_tmp = inputMat[genes_tmp, ]
-      if(!is.null(seed)){set.seed(null)} # set random seed if provided.
+      if(!is.null(seed)){set.seed(seed)} # set random seed if provided.
       ddcor_res = suppressWarnings(
         ddcorAll_par(inputMat = inputMat_tmp, 
                                design = design, 
