@@ -5,7 +5,6 @@
 # Zhang B, McKenzie A (2023). _DGCA: Differential Gene Correlation Analysis_. R package version 1.0.3, <https://CRAN.R-project.org/package=DGCA>.
 
 # Started October 2023
-#
 
 # © Richard M Segnitz 2023 (modified from DGCA)
 # License: This software is licensed under GNU General Public License, and may
@@ -19,10 +18,7 @@
 # 1) Improve the efficiency of calculations made within DGCA, especially when permutations are run.
 # 2) Allow the user to return gene-level results used for calculating module-level statistics. 
 #   This reduces redundancy and ensures that any permutation based statistics are calculated from 
-#    same randomizations of the data.
-#
-
-
+#   same randomizations of the data.
 
 moduleDC_par<-
   function (inputMat, design, compare, genes, labels, corr_cutoff = 0.99, 
