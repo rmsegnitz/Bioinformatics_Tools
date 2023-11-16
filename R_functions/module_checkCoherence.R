@@ -57,7 +57,7 @@
 ########### DEFINE INPUTS ###############
 
 module_checkCoherence<-function(module_gene_sets, 
-                                voom_obj, geneSet = "geneSet",
+                                voom_obj, geneSet_col = "geneSet",
                                 module_set="STUDY", 
                                 sample_set="STUDY", 
                                 remove_sets = NULL,
@@ -72,14 +72,17 @@ require(tidyverse)
   
 moduleSets<- module_gene_sets
 if(class(voom_obj)[1]== "EList"){voomData<-voom_obj$E}else{voomData<-voom_obj}
-
+if(!is.numeric(voomData)){
+  print("Warning, count/expression matrix is non-numeric. 
+        This usually arises when a non-expression column has been retained from a metadata object (eg due to grouping). 
+        Be advised to check for stray metadata in the expression matrix.")}
 
 
 #-----------------------------  
 # Calculate the gene set means (module expression)
 #-----------------------------
 uniGS<-moduleSets%>%
-  pull(get(geneSet))%>%
+  pull(geneSet_col)%>%
   unique()%>%as.character()%>%mixedsort() # Pull unique modules & order correctly
 
 GSsub<-c()
