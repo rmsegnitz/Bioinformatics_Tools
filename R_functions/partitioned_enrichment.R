@@ -219,14 +219,18 @@ ptEnrich<-function(parent_geneset, geneset_sub1, geneset_sub2, background, pt_pr
   
   
   # Return if not running permutations
+  terms_not_in_background<- filter(pt1_pt2_compdf, term_in_background==0)$term_id
+  
+  
+  
   if(is.null(permutations)){
     if(enrich_parent){
+      parent_enrichment<-filter(parent_enrichment, term_in_background>0)
       return(list(parent_enrichment, 
                   pertition_enrichment=pt1_pt2_compdf, 
-                  deltaPlot1=pt_comp_deltaPlot1))
+                  terms_not_in_background))
     } else {
-      return(list(pertition_enrichment=pt1_pt2_compdf, 
-                  deltaPlot1=pt_comp_deltaPlot1))
+      return(list(pertition_enrichment=pt1_pt2_compdf, terms_not_in_background))
     }
   } else {
     
@@ -371,12 +375,8 @@ ptEnrich<-function(parent_geneset, geneset_sub1, geneset_sub2, background, pt_pr
     dplyr::left_join(pt1_pt2_compdf, permutation_tests)
  
   #Final filtering to remove unrepresented pathways
-  terms_not_in_background<- filter(partitioned_enrichment_GO$parent_enrichment, term_in_background==0)$term_id
   pt1_pt2_compdf_wPerm<-filter(pt1_pt2_compdf_wPerm, term_in_background>0)
-  parent_enrichment<-filter(parent_enrichment, term_in_background>0)
   
-  
-  return(list(partition_enrichment=pt1_pt2_compdf_wPerm, parent_enrichment=parent_enrichment,
-              deltaPlot1=pt_comp_deltaPlot1, terms_not_in_background))
+  return(list(partition_enrichment=pt1_pt2_compdf_wPerm, parent_enrichment=parent_enrichment, terms_not_in_background))
   
 }
