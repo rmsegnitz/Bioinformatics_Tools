@@ -206,16 +206,16 @@ ptEnrich<-function(parent_geneset, geneset_sub1, geneset_sub2, background, pt_pr
                   partition_dEnrichment=abs(enrichment_pt1-enrichment_pt2),
                   partition_dpval=abs(-log10(p_value_pt1)+log10(p_value_pt2)))
   
-  pt_comp_deltaPlot1<-
-    pt1_pt2_compdf%>%
-    arrange(term_in_background)%>%
-    ggplot(aes(y=partition_dpval, x=partition_dEnrichment))+
-    geom_jitter(width = 0.002, aes(color=term_in_background), alpha=0.5)+
-    scale_color_viridis_c()+
-    labs(x="Diff. in Enrichment", 
-         y="Diff in -log10(enrichment pval)", 
-         color="Pathway Genes Present\nIn Background")+
-    theme_bw()
+  # pt_comp_deltaPlot1<-
+  #   pt1_pt2_compdf%>%
+  #   arrange(term_in_background)%>%
+  #   ggplot(aes(y=partition_dpval, x=partition_dEnrichment))+
+  #   geom_jitter(width = 0.002, aes(color=term_in_background), alpha=0.5)+
+  #   scale_color_viridis_c()+
+  #   labs(x="Diff. in Enrichment", 
+  #        y="Diff in -log10(enrichment pval)", 
+  #        color="Pathway Genes Present\nIn Background")+
+  #   theme_bw()
   
   
   # Return if not running permutations
