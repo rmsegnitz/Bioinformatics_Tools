@@ -98,6 +98,9 @@ ptEnrich<-function(parent_geneset, geneset_sub1, geneset_sub2, background, pt_pr
   require(doSNOW)
   require(assertthat)
   
+  # Define partitions to include in results
+  partitions<-list(partition1=geneset_sub1, partition2=geneset_sub2)
+  
   # Define slight modification of the core hypergeomtric enrichment function from "fenr" 
   # such that pathways with no representation in the queried gene list are still included in 
   # results output & FDR calculation. 
@@ -228,9 +231,12 @@ ptEnrich<-function(parent_geneset, geneset_sub1, geneset_sub2, background, pt_pr
       parent_enrichment<-filter(parent_enrichment, term_in_background>0)
       return(list(parent_enrichment=parent_enrichment, 
                   pertition_enrichment=pt1_pt2_compdf, 
+                  partitions=partitions,
                   terms_not_in_background=terms_not_in_background))
     } else {
-      return(list(partition_enrichment=pt1_pt2_compdf, terms_not_in_background=terms_not_in_background))
+      return(list(partition_enrichment=pt1_pt2_compdf, 
+                  partitions=partitions,
+                  terms_not_in_background=terms_not_in_background))
     }
   } else {
     
@@ -377,6 +383,9 @@ ptEnrich<-function(parent_geneset, geneset_sub1, geneset_sub2, background, pt_pr
   #Final filtering to remove unrepresented pathways
   pt1_pt2_compdf_wPerm<-filter(pt1_pt2_compdf_wPerm, term_in_background>0)
   
-  return(list(partition_enrichment=pt1_pt2_compdf_wPerm, parent_enrichment=parent_enrichment, terms_not_in_background=terms_not_in_background))
+  return(list(partition_enrichment=pt1_pt2_compdf_wPerm, 
+              parent_enrichment=parent_enrichment, 
+              partitions=partitions,
+              terms_not_in_background=terms_not_in_background))
   
 }
