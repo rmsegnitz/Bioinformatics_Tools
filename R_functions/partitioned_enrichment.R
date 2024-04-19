@@ -229,12 +229,12 @@ ptEnrich<-function(parent_geneset, geneset_sub1, geneset_sub2, background, pt_pr
   if(is.null(permutations)){
     if(enrich_parent){
       parent_enrichment<-filter(parent_enrichment, term_in_background>0)
-      return(list(parent_enrichment=parent_enrichment, 
-                  pertition_enrichment=pt1_pt2_compdf, 
+      return(list(parent_enrichment=arrange(parent_enrichment, p_value), 
+                  partition_enrichment=arrange(pt1_pt2_compdf, delta_enrichment_empirical_pval), 
                   partitions=partitions,
                   terms_not_in_background=terms_not_in_background))
     } else {
-      return(list(partition_enrichment=pt1_pt2_compdf, 
+      return(list(partition_enrichment=arrange(pt1_pt2_compdf, delta_enrichment_empirical_pval), 
                   partitions=partitions,
                   terms_not_in_background=terms_not_in_background))
     }
@@ -383,9 +383,193 @@ ptEnrich<-function(parent_geneset, geneset_sub1, geneset_sub2, background, pt_pr
   #Final filtering to remove unrepresented pathways
   pt1_pt2_compdf_wPerm<-filter(pt1_pt2_compdf_wPerm, term_in_background>0)
   
-  return(list(partition_enrichment=pt1_pt2_compdf_wPerm, 
-              parent_enrichment=parent_enrichment, 
+  return(list(partition_enrichment=arrange(pt1_pt2_compdf_wPerm, delta_enrichment_empirical_pval), 
+              parent_enrichment=arrange(parent_enrichment, p_value), 
               partitions=partitions,
               terms_not_in_background=terms_not_in_background))
+  
+}
+
+
+
+###########################################################
+#                                                         #
+#     2) Plot Partitioned Enrichment                      #
+#                                                         #
+###########################################################
+
+# Combine partitioned enrichment with parent enrichment results and plot comparisons. 
+# Most likely needs manual curation but serves to provide overview and returns dataframe for plotting further.
+
+# ptEntich_obj = object returned by ptEnrich(); sig_cutoff = significance label p value cutoff; term_cleanup = string to remove from term_id
+plot_ptEnrich=function(ptEntich_obj, sig_cutoff_p=0.01, term_cleanup=NULL, plot_label=NULL, limit_term_labs=NULL, numbered.key=F){
+  
+  require(ggtext)
+  
+  if(!all(c("partition_enrichment", "parent_enrichment") %in% names(ptEntich_obj))){
+    stop("Error: Must contain both partitioned enrichment & parent enrichment. Re-run ptEnrich with enrich_parent=T.")
+  }
+  
+  # Format dataframe for comparison
+  enrichment_comparison<-
+    ptEntich_obj$partition_enrichment%>%
+    
+    left_join(ptEntich_obj$parent_enrichment%>%dplyr::select(term_name, enrichment, p_value, p_adjust))%>%
+    mutate(delta_enrichment_empirical_fdr=p.adjust(delta_enrichment_empirical_pval, method="BH"))%>%
+    mutate(partition_result_category=ifelse(delta_enrichment_empirical_pval<sig_cutoff_p, 
+                                            case_when(p_value_pt1<sig_cutoff_p & p_value_pt2>=sig_cutoff_p ~ "partition 1 only",
+                                                      p_value_pt2<sig_cutoff_p & p_value_pt1>=sig_cutoff_p ~ "partition 2 only",
+                                                      p_value_pt2<sig_cutoff_p & p_value_pt1<sig_cutoff_p ~ "partition 1 & 2", 
+                                                      .default = "ns"), "ns"))%>%
+    mutate(partition_trend=ifelse(delta_enrichment_empirical_pval<sig_cutoff_p, 
+                                  case_when(enrichment_pt1>enrichment_pt2 ~"partition1",
+                                            enrichment_pt1<enrichment_pt2 ~"partition2"), "ns"))%>%
+    rowwise()%>%
+    mutate(label_all=ifelse(!is.null(!!term_cleanup),
+             str_to_sentence(str_replace_all(str_remove_all(term_name, !!term_cleanup), "_", " ")),
+             str_to_sentence(str_replace_all(term_name, "_", " "))))%>%
+    mutate(label_sig=ifelse(delta_enrichment_empirical_pval<sig_cutoff_p, label_all, NA))%>%
+    ungroup()%>%
+    arrange(delta_enrichment_empirical_pval, -delta_enrichment_observed)%>%
+    mutate(label_sig_numeric=row_number())%>%
+    mutate(label_sig_numeric=ifelse(is.na(label_sig), NA, label_sig_numeric))
+  
+  # Assemble plots to highlight significantly different enrichments
+  nperm=unique(enrichment_comparison$nperm)
+  
+  plot1_labs<-filter(enrichment_comparison, !is.na(label_sig))
+  
+  if(!is.null(limit_term_labs)){plot1_labs<-arrange(plot1_labs, delta_enrichment_empirical_pval)%>%head(limit_term_labs)}
+  if(is.null(limit_term_labs) & dim(plot1_labs)[1]>20){
+    plot1_labs<-plot1_labs%>%mutate(label_sig_og=label_sig, label_sig=label_sig_numeric)} 
+  
+  plot1<-
+    enrichment_comparison%>%
+    ggplot(aes(y=-log10(delta_enrichment_empirical_pval+1/(nperm+100)), x=-log10(p_value+1/(nperm+100))))+
+    geom_point(aes(color=partition_result_category, size=delta_enrichment_observed, 
+                   shape=delta_enrichment_empirical_pval<sig_cutoff_p))+
+    geom_vline(xintercept = -log10(0.05),  linetype="dashed")+
+    geom_vline(xintercept = -log10(0.01),  linetype="dotted")+
+    geom_hline(yintercept = -log10(0.05), linetype="dashed")+
+    geom_hline(yintercept = -log10(0.01), linetype="dotted")+
+    geom_label(x=0.1, y=-log10(0.05), label="p=0.05")+
+    geom_label(x=0.1, y=-log10(0.01), label="p=0.01")+
+    ggrepel::geom_text_repel(data=plot1_labs, 
+                              aes(label=label_sig, color=partition_result_category), max.overlaps = Inf)+
+    scale_color_manual(values=c("partition 1 only"="dodgerblue",  
+                                "partition 2 only"="red3", 
+                                "partition 1 & 2"="purple3"))+
+    scale_shape_manual(values=c("TRUE"=16, "FALSE"=1))+
+    xlim(c(0,NA))+
+    ylim(c(0,NA))+
+    theme_bw()+theme(panel.grid = element_blank())+
+    labs(y="Partitioned Enrichment -log10(pval)", 
+         x="Full Module Enrichment \n-log10(pval)", 
+         shape=paste0("Partitioned Enrichment \nPermuatation p<", sig_cutoff_p),
+         color=paste0("Individual Partition \nEnrichment p<", sig_cutoff_p),
+         size="Partitions Difference \nin Enrichment Score")
+  
+  
+  plot2_df<-
+    enrichment_comparison%>%
+    filter((p_value)<sig_cutoff_p | p_value_pt1<sig_cutoff_p | p_value_pt2<sig_cutoff_p | delta_enrichment_empirical_pval<sig_cutoff_p)%>%
+    dplyr::select(term_name, label_all, label_sig, label_sig_numeric, term_in_background,partition_result_category, p_value, p_value_pt1, p_value_pt2, 
+                  enrichment_pt1, enrichment_pt2, delta_enrichment_empirical_pval)%>%
+    pivot_longer(c(p_value_pt1, p_value_pt2, enrichment_pt1, enrichment_pt2), 
+                   names_to = "metric", values_to = "value")%>%
+    separate(metric, into = c("metric", "partition"), sep = "_pt")%>%
+    mutate(metric=case_when(metric== "p_value"~"partition_p", metric=="enrichment" ~ "partition_enrichment"))%>%
+    pivot_wider(names_from = "metric", values_from = "value")
+ 
+  plot2_df_labs<-
+    filter(plot2_df, !is.na(label_sig))%>%
+    group_by(label_sig,label_sig_numeric, partition_result_category, delta_enrichment_empirical_pval)%>%summarize(p_value=unique(p_value), min_pt_p=min(partition_p))
+  if(is.null(limit_term_labs) & dim(plot2_df_labs)[1]>20){
+    plot2_df_labs<-plot2_df_labs%>%mutate(label_sig_og=label_sig, label_sig=label_sig_numeric)} 
+  if(!is.null(limit_term_labs)){plot2_df_labs<-arrange(plot2_df_labs, delta_enrichment_empirical_pval)%>%head(limit_term_labs)}
+   
+  
+  plot2_df_segs<-
+    plot2_df%>%
+    dplyr::select(term_name, p_value, partition, partition_p, delta_enrichment_empirical_pval)%>%
+    pivot_wider(values_from = partition_p, names_from = partition, names_prefix = "p_pt")
+    
+  plot2<-
+    plot2_df%>%
+    ggplot(aes(x=-log10(p_value+(1/(nperm+100)))))+
+    geom_abline(intercept = 0, slope=1, linetype="dashed")+
+    
+    geom_segment(data=plot2_df_segs,
+                aes(x=-log10(p_value+(1/(nperm+100))), xend=-log10(p_value+(1/(nperm+100))), 
+                     y=-log10(p_pt1+(1/(nperm+100))), yend=-log10(p_pt2+(1/(nperm+100)))), color="lightgrey")+
+    
+    geom_segment(data=filter(plot2_df_segs, delta_enrichment_empirical_pval<sig_cutoff_p) ,
+                 aes(x=-log10(p_value+(1/(nperm+100))), xend=-log10(p_value+(1/(nperm+100))), 
+                     y=-log10(p_pt1+(1/(nperm+100))), yend=-log10(p_pt2+(1/(nperm+100)))), color="black")+
+    
+    geom_point(aes(y=-log10(partition_p+1/(nperm+100)), size=partition_enrichment), color="white")+
+
+    geom_point(aes(y=-log10(partition_p+1/(nperm+100)), size=partition_enrichment, 
+                   shape=delta_enrichment_empirical_pval<sig_cutoff_p, color=partition))+
+    
+    ggrepel::geom_text_repel(data= plot2_df_labs,
+                               aes(label=label_sig, x=-log10(p_value+(1/(nperm+100))), y=-log10(min_pt_p+(1/(nperm+100))),
+                                   color=partition_result_category),
+                               max.overlaps = Inf)+
+    ggtext::geom_richtext(label="x=y", x=0.25, y=0.25, angle=45)+
+    scale_color_manual(values=c("1"="dodgerblue", "2"="red3", "ns"="grey",
+                                "partition 1 only"="dodgerblue", "partition 2 only"="red3", "partition 1 & 2"="purple3"),
+                       breaks = c("1", "2"))+
+    scale_shape_manual(values=c("TRUE"=16, "FALSE"=1))+
+    xlim(c(-0.1,NA))+
+    ylim(c(-0.1,NA))+
+    labs(y="Individual Partition \nEnrichment -log10(pval)", 
+         x="Full Module Enrichment \n-log10(pval)", 
+         shape=paste0("Partitioned Enrichment \nPermuatation p<", sig_cutoff_p),
+         color="Partition",
+         size="IndividualPartition Enrichment Score")+
+    theme_bw()+
+    theme(panel.grid = element_blank())+
+    coord_fixed()
+  
+  if((is.null(limit_term_labs) & dim(plot2_df_labs)[2]>20) | numbered.key){
+    plot2_df_labs2<-
+      plot2_df_labs%>%
+      mutate(facet_group=ceiling(label_sig/50))%>%
+      group_by(facet_group)%>%
+      mutate(group_size=length(facet_group))%>%
+      mutate(facet_group=ifelse(group_size<15, facet_group-1, facet_group))%>%
+      ungroup()%>%
+      arrange(-label_sig)%>%
+      mutate(label_sig=factor(label_sig, levels=.$label_sig))
+    
+    plot_key<-
+      plot2_df_labs2%>%
+      ggplot(aes(y=label_sig, x=0))+
+      geom_text(aes(label=label_sig_og, color=partition_result_category), hjust=0)+
+      scale_color_manual(values=c("1"="dodgerblue", "2"="red3", "ns"="grey40",
+                                  "partition 1 only"="dodgerblue", "partition 2 only"="red3", "partition 1 & 2"="purple3"),
+                         breaks = c("1", "2"), guide="none")+
+      scale_x_continuous(limits=c(0,20))+
+      labs(y="", x="")+
+      facet_wrap(~facet_group, nrow=1, scales = "free")+
+      theme_bw()+
+      theme(axis.text.x = element_blank(),
+            axis.ticks.x =  element_blank(),
+            strip.text = element_blank(), 
+            strip.background = element_rect(fill="white"))
+    
+  }
+  
+  
+  if(!is.null(plot_label)){
+    plot1<-plot1+ggtitle(plot_label)
+    plot2<-plot2+ggtitle(plot_label)
+  }
+  
+  if(exists("plot_key", inherits = FALSE)){
+    return(list(enrichment_comparison=arrange(enrichment_comparison, delta_enrichment_empirical_pval), plot_overview=plot1, plot_comparePartitions=plot2, plot_key=plot_key))
+  }else{
+  return(list(enrichment_comparison=arrange(enrichment_comparison, delta_enrichment_empirical_pval), plot_overview=plot1, plot_comparePartitions=plot2))}
   
 }
