@@ -1,5 +1,5 @@
 
-# Implimentation of parallel processing within core DGCA functions.
+# Implementation of parallel processing within core DGCA functions.
 # Author: Max Segnitz, msegnitz@uw.edu
 # Modified from DGCA  
 # Zhang B, McKenzie A (2023). _DGCA: Differential Gene Correlation Analysis_. R package version 1.0.3, <https://CRAN.R-project.org/package=DGCA>.
@@ -30,7 +30,7 @@ moduleDC_par<-
     
     if (!length(genes) == length(labels)) 
       stop("Genes and labels vectors must be the same length.")
-    labels_names = unique(labels)
+    labels_names = unique(labels)%>%as.character() # ensure proper handling.
     mdc_vector = vector()
     mdc_signif = vector()
     module_size = vector()
