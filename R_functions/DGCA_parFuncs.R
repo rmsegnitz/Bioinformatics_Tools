@@ -359,8 +359,8 @@ function (zDiff, zDiffPerm, dCorAvgType, oneSidedPVal = FALSE,
         zdiff_perm_gene_medians = colMeans(zdiff_perm_gene_nonself)
       }
       
-      empirical_pval[i] = 1 - sum(abs(zdiff_medians[i]) > 
-                                    abs(zdiff_perm_gene_medians))/length(zdiff_perm_gene_medians)
+      empirical_pval[i] = 1 - (sum(abs(zdiff_medians[i]) > 
+                                    abs(zdiff_perm_gene_medians))+1)/(length(zdiff_perm_gene_medians)+1)
     }
     
   
