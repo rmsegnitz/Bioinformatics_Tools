@@ -1,0 +1,100 @@
+---
+title: "Testing Script for DGCA Parallel Functions"
+author: "Max Segnitz"
+date: "2024-05-29"
+output: html_document
+---
+
+```{r}
+# Load Customization of DGCA with improved speed & parallel handling.
+source("https://raw.githubusercontent.com/rmsegnitz/Bioinformatics_Tools/master/R_functions/DGCA_parFuncs.R")
+
+library(tidyverse)
+library(kimma)
+```
+
+
+```{r}
+# load sample data
+sample_dat<-kimma::example.voom
+
+# define simple contrasts
+View(sample_dat$targets)
+
+# define reduced module set
+genes_clust<-
+  sample_dat$E[heatmap(sample_dat$E)$rowInd, ]
+
+dummy_mods<-
+  data.frame(geneName=rownames(genes_clust), 
+             module=c(rep("dummy_100", 100), rep("dummy_150", 150), rep("dummy_250", 250),
+                      rep("dummy_500", 500)))%>%
+  left_join(dplyr::select(sample_dat$genes, geneName, hgnc_symbol))
+
+dummy_mods_DGCA<-
+  dplyr::select(dummy_mods, geneName, module)%>%
+  dplyr::rename(values=geneName, ind=module)%>%
+  arrange(ind)
+```
+
+```{r}
+
+
+#Define design matrices as in limma
+design_mat <-
+  model.matrix(~ 0 + virus, 
+               data=sample_dat$targets)
+
+# rename/simplify matrix column names
+colnames(design_mat)<-str_remove_all(colnames(design_mat), "virus")
+contrast_test<-c("none", "HRV")
+
+system.time(
+modules_DGCA_test<-
+                moduleDC_par(
+                  inputMat = sample_dat$E, # reduce input matrix to relevant libraries
+                        design = design_mat, # reduce to relevant libraries and groups
+                        compare = contrast_test,
+                        genes = dummy_mods_DGCA$values, 
+                        labels = dummy_mods_DGCA$ind, 
+                        nPerms=1000, number_DC_genes=0,
+                        dCorAvgMethod="median", corrType="pearson", 
+                        num_cores=10, 
+                        save_gene_level=T, out.dir="~/Desktop/DGCA_test/test_together", seed=32)
+)
+
+```
+
+# Test Running with individualized modules
+
+It would appear that there may be residual code in the DGCA functions that calculates ALL pairwise correlations from the entire expression matrix it receives (as opposed to only running within module). This may be intentional, and perhaps it would be unwise to skirt this, but I would like to test whether it impacts the resulting stats and run times. 
+
+```{r}
+modules_DGCA_test_perMod<-list()
+system.time(
+for(i in unique(dummy_mods_DGCA$ind)){
+    
+  mod_sub=filter(dummy_mods_DGCA, ind==i)
+  expression_sub<-sample_dat$E[mod_sub$values, ]
+   
+modules_DGCA_test_perMod[[i]]<-
+                moduleDC_par(
+                  inputMat = expression_sub, # reduce input matrix to relevant libraries
+                        design = design_mat, # reduce to relevant libraries and groups
+                        compare = contrast_test,
+                        genes = mod_sub$values, 
+                        labels = mod_sub$ind, 
+                        nPerms=1000, number_DC_genes=0,
+                        dCorAvgMethod="median", corrType="pearson", 
+                        num_cores=10, 
+                        save_gene_level=T, out.dir="~/Desktop/DGCA_test/test_loop", seed=32)}
+)
+
+```
+
+```{r}
+View(modules_DGCA_test)
+View(modules_DGCA_test_perMod$dummy_100)
+
+```
+

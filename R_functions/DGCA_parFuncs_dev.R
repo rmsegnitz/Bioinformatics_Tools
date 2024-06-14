@@ -247,7 +247,8 @@ ddcorAll_par<- function(inputMat, design, compare, inputMatB = NULL, splitSet = 
 
 getDCorPerm_par<-
   function (inputMat, design, compare, inputMatB = NULL, impute = FALSE, 
-          nPerms = 10, corrType = "pearson", corr_cutoff = 0.99, signType = "none", num_cores=num_cores) {
+          nPerms = 10, corrType = "pearson", corr_cutoff = 0.99, 
+          signType = "none", num_cores=num_cores) {
   
   # Load the required libraries
   require(foreach)
@@ -346,6 +347,7 @@ function (zDiff, zDiffPerm, dCorAvgType, oneSidedPVal = FALSE,
     }
     zdiff_medians = numeric(ncol(zDiff))
     empirical_pval = numeric(ncol(zDiff))
+    #empirical_pval_fromNull = numeric(ncol(zDiff))
     nGenes = ncol(zDiff)
     
     for (i in 1:nGenes) {
@@ -361,12 +363,19 @@ function (zDiff, zDiffPerm, dCorAvgType, oneSidedPVal = FALSE,
       
       empirical_pval[i] = 1 - (sum(abs(zdiff_medians[i]) > 
                                     abs(zdiff_perm_gene_medians))+1)/(length(zdiff_perm_gene_medians)+1)
+      
+      #null_dist_i<-infer::calculate(zdiff_medians[i], stat = "median")
+      
+      # empirical_pval_fromNull[i] = infer::get_pvalue(x = null_dist_i, 
+      #                                       obs_stat = zdiff_perm_gene_medians, direction = "two_sided")
     }
     
   
     avg_dcor_df = 
        data.frame(Gene = colnames(zDiff), avgZDiff = zdiff_medians, 
-                             empirical_pVal = empirical_pval)
+                             empirical_pVal = empirical_pval#, 
+                  #empirical_pval_fromNull=empirical_pval_fromNull
+                  )
     
        avg_dcor_df$pVal_adj = p.adjust(avg_dcor_df$empirical_pVal, 
                                     method = "BH")

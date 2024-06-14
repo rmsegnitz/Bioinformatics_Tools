@@ -1,0 +1,191 @@
+---
+title: "Untitled"
+author: "Max Segnitz"
+date: "2024-05-03"
+output: html_document
+---
+```{r}
+# Load Customization of DGCA with improved speed & parallel handling.
+source("https://raw.githubusercontent.com/rmsegnitz/Bioinformatics_Tools/master/R_functions/DGCA_parFuncs.R")
+
+library(tidyverse)
+
+```
+
+
+```{r}
+# Scratch
+test_results<-read.csv("~/Documents/WORK/UW/ALTMAN/Github/MPS2_DECOHERENCE/results/DGCA/EC/gene_level_results/geneSummary_DCor_withinModule_Mepolizumab_visit01_Mepolizumab_endpoint.csv", row.names = "X")
+
+test_results<-test_results%>%group_by(module)%>%mutate(FDR_new=p.adjust(empirical_pVal, method="BH"))
+
+ggplot(test_results, 
+       aes(x=medianZDiff, y=-log10(empirical_pVal)))+
+  geom_point()+
+facet_wrap(~module)
+
+ggplot(test_results, 
+       aes(x=abs(medianZDiff), y=-log10(empirical_pVal)))+
+  geom_point()+
+facet_wrap(~module)
+  
+```
+
+
+
+```{r}
+temp_runtimes<-
+  readxl::read_xlsx("R_functions/DGCA_par_runtimes.xlsx")
+```
+
+
+```{r}
+temp_runtimes%>%
+  ggplot(aes(x=size, y=sec_per_calc_per_core))+
+  geom_point()+
+  facet_wrap(~permutations, nrow=1, scales="free")
+
+
+
+temp_runtimes%>%
+  filter(!is.na(run_time_sec))%>%
+  ggplot(aes(x=total_calculations, y=run_time_sec/60))+
+  geom_point(aes(size=size, color=permutations), shape=1)+
+  
+  geom_smooth(se=F)+
+  labs(x="Number of total pairwise Calculations\n(Per Contrast)", 
+       y="Total Run Time (min)\nOn 10 Cores", 
+       size="Module Size", color="Permutations")+
+  scale_x_log10()+
+  theme_bw()
+```
+
+
+```{r}
+demo_df<-
+  data.frame(module_size=seq(10, 2000, 5))%>%
+  mutate(permutations=1, 
+         pairwise=(module_size*(module_size-1))/2)%>%
+  bind_rows(mutate(., permutations=3))%>%
+  bind_rows(mutate(filter(., permutations==1), permutations=6))%>%
+  bind_rows(mutate(filter(., permutations==1), permutations=10))%>%
+  bind_rows(mutate(filter(., permutations==1), permutations=30))%>%
+  bind_rows(mutate(filter(., permutations==1), permutations=60))%>%
+  bind_rows(mutate(filter(., permutations==1), permutations=10))%>%
+  bind_rows(mutate(filter(., permutations==1), permutations=100))%>%
+  bind_rows(mutate(filter(., permutations==1), permutations=300))%>%
+  bind_rows(mutate(filter(., permutations==1), permutations=500))%>%
+  bind_rows(mutate(filter(., permutations==1), permutations=800))%>%
+  bind_rows(mutate(filter(., permutations==1), permutations=1000))%>%
+  bind_rows(mutate(filter(., permutations==1), permutations=1500))%>%
+  bind_rows(mutate(filter(., permutations==1), permutations=2000))%>%
+  bind_rows(mutate(filter(., permutations==1), permutations=2500))%>%
+  bind_rows(mutate(filter(., permutations==1), permutations=3000))%>%
+  bind_rows(mutate(filter(., permutations==1), permutations=4000))%>%
+  bind_rows(mutate(filter(., permutations==1), permutations=5000))%>%
+  bind_rows(mutate(filter(., permutations==1), permutations=6000))%>%
+  bind_rows(mutate(filter(., permutations==1), permutations=6500))%>%
+  bind_rows(mutate(filter(., permutations==1), permutations=7500))%>%
+  bind_rows(mutate(filter(., permutations==1), permutations=8000))%>%
+  bind_rows(mutate(filter(., permutations==1), permutations=8500))%>%
+  bind_rows(mutate(filter(., permutations==1), permutations=9000))%>%
+  bind_rows(mutate(filter(., permutations==1), permutations=10000))%>%
+  mutate(total_calculations=pairwise*permutations,
+         empirical_p_precision=1/permutations)%>%
+  mutate(aprox_runtime_sec=total_calculations*5.09183e-05, 
+         aprox_runtime_hrs=aprox_runtime_sec/60/60)
+
+
+calc_contours<-
+  demo_df%>%
+  ggplot(aes(x=module_size, y=permutations, z=total_calculations))+
+  stat_summary_hex(bins=10, color="lightgrey") +
+  scale_fill_gradient(low = "white", high = "red3")+
+  theme_bw()+
+  theme(aspect.ratio = 1)+
+  labs(x="Module Size", y="No. of Permutations", 
+       fill= "Total Calculations\nper Contrast")
+
+time_contours<-
+  demo_df%>%
+  ggplot(aes(x=module_size, y=permutations, 
+             z=sqrt(aprox_runtime_hrs)))+
+  stat_summary_hex(bins=10, color=NA) +
+  scale_fill_gradient(low = "gold", high = "red3", 
+                      breaks=sqrt(c(0, 5, 10, 25, 50, 100, 200, 300)),
+                      labels=c(0, 5, 10, 25, 50, 100, 200, 300))+
+  theme_bw()+
+  theme(aspect.ratio = 1)+
+  labs(x="Module Size", y="No. of Permutations", 
+       fill= "Aprox Runtime per Core\n (Hours)")
+
+time_contours_2<-
+time_contours+
+  geom_hline(yintercept = c(10^c(1:4)), linewidth=0.2)+
+  geom_vline(xintercept = seq(0,2000, 250), linewidth=0.2)+
+  geom_smooth(data=filter(demo_df, between(aprox_runtime_hrs, 1, 2)), 
+              linetype="dashed", color="black", linewidth=0.35, se=F)+
+  geom_smooth(data=filter(demo_df, between(aprox_runtime_hrs, 4, 5)), 
+              linetype="dashed", color="black", linewidth=0.35, se=F)+
+  geom_smooth(data=filter(demo_df, between(aprox_runtime_hrs, 9, 10)), 
+              linetype="dashed", color="black", linewidth=0.35, se=F)+
+  geom_smooth(data=filter(demo_df, between(aprox_runtime_hrs, 23, 24)), 
+              linetype="dashed", color="black", linewidth=0.35, se=F)+
+  scale_y_log10()
+```
+
+# Demonstrate possible permutations
+```{r}
+
+sample_nums<-6:100
+combos<-vector()
+
+for(i in 1:length(sample_nums)){
+
+# Find unique combinations from vector of length
+n_samp<-sample_nums[i] # define number of samples
+group_a<-round(0.4*n_samp) # divide groups 40/60
+group_b<-n_samp-group_a
+
+# number of unique ways to draw group a, check that this is balance by group b
+a_possible<-factorial(n_samp)/(factorial(group_a)*factorial(n_samp-group_a))
+#b_possible<-factorial(n_samp)/(factorial(group_b)*factorial(n_samp-group_b))
+
+combos[i]<-a_possible
+}
+
+# Combine into dataframe
+random_redraw_scaling<-
+  data.frame(sample_n=sample_nums, random_combos_40_60=combos)
+
+# Plot to visualize
+random_redraw_scaling_plot_1<-
+  random_redraw_scaling%>%
+  ggplot(aes(x=sample_n, y=random_combos_40_60))+
+  #geom_point()+
+  geom_path()+
+  theme_bw()+
+  labs(x="Total Samples", 
+       y="Possible Group Randomizations\n w/ 40/60 Split")
+
+random_redraw_scaling_plot_2<-
+  random_redraw_scaling%>%
+  ggplot(aes(x=sample_n, y=random_combos_40_60))+
+  geom_hline(yintercept = c(1e2, 1e3, 1e4, 1e5), linetype="dashed", color="red3")+
+  geom_path()+
+  scale_y_log10(breaks=c(100, 1000, 10000, 1e5, 1e10, 1e15, 1e20, 1e25))+
+  scale_x_continuous(breaks=c(6, seq(10,100,5)))+
+  theme_bw()+
+  labs(x="Total Samples", 
+       y="Possible Group Randomizations\n w/ 40/60 Split")
+
+```
+
+# SCRATCH
+
+NOTES:
+
+On p-value approximation:
+However, Davison and Hinkley (1997) give the correct formula for obtaining an empirical P value as (r+1)/(n+1). The reasoning is roughly as follows: if the null hypothesis is true, then the test statistics of the n replicates and the test statistic of the actual data are all realizations of the same random variable. These realizations can be ranked, and then the probability, under the null hypothesis, that the test statistic from the actual data has the observed rank or a higher rank is (r+1)/(n+1), the proportion of all possible rankings of the realizations that fulfill this criterion.
+
+

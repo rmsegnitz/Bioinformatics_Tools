@@ -95,7 +95,7 @@ ptEnrich<-function(parent_geneset, geneset_sub1, geneset_sub2, background, pt_pr
   require(doParallel)
   require(foreach)
   require(doRNG)
-  require(doSNOW)
+  #require(doSNOW)
   require(assertthat)
   
   # Define partitions to include in results
@@ -253,7 +253,7 @@ ptEnrich<-function(parent_geneset, geneset_sub1, geneset_sub2, background, pt_pr
     # Establish parallel computing specifications
     if(is.null(ncores)){ncores=detectCores()-4}
     cl = parallel::makeCluster(ncores)
-    doSNOW::registerDoSNOW(cl)
+    doParallel::registerDoParallel(cl)
     # Set up progress bar
     pb <- txtProgressBar(max = permutations, style = 3)
     progress <- function(n) setTxtProgressBar(pb, n)
