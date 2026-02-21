@@ -1,0 +1,759 @@
+---
+title: "geneLME: Scalable Per-Gene Linear Mixed Effects Models"
+subtitle: "Function Tutorial with Worked Examples"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    toc_depth: 3
+    theme: flatly
+    highlight: tango
+    code_folding: show
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo        = TRUE,
+  message     = FALSE,
+  warning     = FALSE,
+  comment     = "#>",
+  fig.align   = "center"
+)
+```
+
+---
+
+# Overview
+
+`geneLME` fits one linear mixed effects model per gene across a full RNA-seq expression matrix,
+extracting ANOVA tables and user-defined `emmeans`-based contrasts in parallel via the `future`
+framework. It is designed around the `limma` EList data structure.
+
+## Key capabilities
+
+- Fits `lmer` models per gene in parallel (`future_lapply`)
+- Supports voom precision weights (`dat$weights`)
+- Extracts `car::Anova()` type II ANOVA tables with per-predictor coefficient estimates
+- Flexible contrast specification:
+  - **Branch A:** explicit pairwise contrasts across interaction cells via a filterable `contrast_spec` data frame
+  - **Branch B:** named contrast vectors on main-effect marginal means, optionally within levels of a grouping variable
+- Optional second-order contrasts (contrasts-of-contrasts) in both branches
+- Pre-flight input validation with informative error messages
+- Soft-fail on wrong-length `contrasts_secondary`: returns `$contrast_spec` (indexed) for debugging without running models
+- Per-gene outcome tracking: `model_status` column flags singular fits (`"singular_fit"`) vs clean fits (`"success"`); results are returned for all genes, not dropped
+
+## Package dependencies
+
+```{r libs}
+library(lme4)
+library(emmeans)
+library(car)
+library(broom.mixed)
+library(dplyr)
+library(tibble)
+library(purrr)
+library(future)
+library(future.apply)
+
+source("geneLME.R")
+```
+
+---
+
+# Mock Data
+
+All examples use a simulated EList-like object with a **3-treatment × 4-visit paired design**
+(10 patients, 120 samples, 50 genes). Genes 1–10 have a simulated `TrtC:V3` upregulation of +2.5
+log2 units to provide a detectable signal in Branch A examples.
+
+```{r mock-data}
+set.seed(42)
+
+n_patients <- 10
+treatments <- c("TrtA", "TrtB", "TrtC")
+visits     <- c("V1", "V2", "V3", "V4")
+n_genes    <- 50
+
+# Patient-level covariates
+patient_meta <- data.frame(
+  ptID = paste0("pt", sprintf("%02d", 1:n_patients)),
+  sex  = factor(sample(c("M", "F"), n_patients, replace = TRUE)),
+  age  = round(rnorm(n_patients, mean = 38, sd = 10)),
+  stringsAsFactors = FALSE
+)
+
+# Sample metadata (targets)
+targets <- expand.grid(
+  ptID      = paste0("pt", sprintf("%02d", 1:n_patients)),
+  treatment = treatments,
+  visit     = visits,
+  stringsAsFactors = FALSE
+) %>%
+  arrange(ptID, treatment, visit) %>%
+  left_join(patient_meta, by = "ptID") %>%
+  mutate(
+    sample_id           = paste(ptID, treatment, visit, sep = "_"),
+    rNANgUl             = rnorm(n(), mean = 5,    sd = 1),
+    percent_duplication = runif(n(), min = 0.05,  max = 0.55),
+    median_cv_coverage  = rnorm(n(), mean = 0.85, sd = 0.08),
+    lib.size            = round(rnorm(n(), mean = 20e6, sd = 3e6)),
+    norm.factors        = rnorm(n(), mean = 1,    sd = 0.05)
+  )
+rownames(targets) <- targets$sample_id
+
+# Expression matrix
+n_samples <- nrow(targets)
+E_mat <- matrix(rnorm(n_genes * n_samples, mean = 8, sd = 2),
+                nrow = n_genes, ncol = n_samples,
+                dimnames = list(paste0("gene", sprintf("%02d", 1:n_genes)),
+                                targets$sample_id))
+
+# Simulated TrtC:V3 effect on genes 1-10
+trtC_v3 <- which(targets$treatment == "TrtC" & targets$visit == "V3")
+E_mat[1:10, trtC_v3] <- E_mat[1:10, trtC_v3] + 2.5
+
+# Patient random effect
+for (pt in unique(targets$ptID)) {
+  idx <- which(targets$ptID == pt)
+  E_mat[, idx] <- E_mat[, idx] + rnorm(1, 0, 1)
+}
+
+# Voom-like precision weights
+W_mat <- matrix(abs(rnorm(n_genes * n_samples, mean = 1, sd = 0.1)),
+                nrow = n_genes, ncol = n_samples,
+                dimnames = dimnames(E_mat))
+
+# EList-like object
+dat <- list(E = E_mat, weights = W_mat, targets = targets)
+
+# Small subset for faster examples
+dat_sub <- list(E = dat$E[1:10, ], weights = dat$weights[1:10, ], targets = dat$targets)
+
+cat("Design:", n_patients, "patients ×", length(treatments), "treatments ×",
+    length(visits), "visits =", n_samples, "samples\n")
+cat("Genes:", n_genes, "(full) /", nrow(dat_sub$E), "(subset used in examples)\n")
+```
+
+---
+
+# Step 0: `geneLME_contrast_spec()` — Inspect Levels Before Running
+
+Before calling `geneLME()`, use `geneLME_contrast_spec()` to enumerate available contrast
+levels and understand exactly how to construct your contrast arguments. This function has two
+modes depending on whether `contrast_vars` contains `":"`.
+
+## Interaction mode
+
+Pass a single `"var_a:var_b"` string to get all pairwise combinations of interaction cells.
+This returns a `data.frame` that you filter down to the specific contrasts of interest and
+pass directly as `contrast_spec` to `geneLME()`.
+
+```{r contrast-spec-interaction}
+spec_template <- geneLME_contrast_spec(
+  targets       = dat$targets,
+  contrast_vars = "treatment:visit"
+)
+
+# spec_template has two columns: contrast_ref and contrast_lvl.
+# contrast_index is NOT included here — it is added by geneLME() to its $contrast_spec
+# output element once it receives your filtered spec.
+cat("Total pairwise combinations:", nrow(spec_template), "\n\n")
+head(spec_template, 12)
+```
+
+Filter to the contrasts of interest — here, same-visit cross-treatment comparisons at V2 and V3:
+
+```{r contrast-spec-filter}
+my_spec <- spec_template %>%
+  filter(
+    sub(".* ", "", contrast_ref) == sub(".* ", "", contrast_lvl),  # same visit
+    sub(".* ", "", contrast_ref) %in% c("V2", "V3")               # V2 and V3 only
+  )
+
+cat("Filtered to", nrow(my_spec), "contrasts:\n")
+print(my_spec)
+```
+
+## Single/multi-variable mode
+
+Pass a character vector of plain variable names (no `:`). Returns a **named list** — one
+`data.frame(level)` per variable — and prints a message for each variable explaining its role
+in `geneLME()` arguments.
+
+```{r contrast-spec-multivariable}
+ref <- geneLME_contrast_spec(
+  targets       = dat$targets,
+  contrast_vars = c("treatment", "visit")
+)
+```
+
+The printed messages explain:
+
+- **`treatment`** (position 1, primary): its levels define the **length and position order** of
+  `contrasts_primary` vectors in `geneLME()`
+- **`visit`** (position 2, secondary): its levels can be subset via `contrast_var_2_levels`
+  to restrict which groups the primary contrasts are computed within
+
+```{r contrast-spec-multivariable-show}
+cat("treatment levels (contrasts_primary vector positions):\n")
+print(ref$treatment)
+
+cat("\nvisit levels (available for contrast_var_2_levels filtering):\n")
+print(ref$visit)
+```
+
+---
+
+# Branch A: Interaction Contrasts via `contrast_spec`
+
+**Use when:** the model formula contains an interaction term (`treatment * visit` or
+`treatment:visit`) and you want specific, explicitly-defined pairwise contrasts across
+interaction cells.
+
+Under the hood, `geneLME_fit()` computes the full `emmeans` object for the interaction, then
+builds one named contrast vector per row of `contrast_spec` — setting the reference cell to
+−1, the comparison cell to +1, and all others to 0. This guarantees that only the contrasts
+you define are run.
+
+## Basic Branch A call
+
+```{r branch-a}
+result_A <- geneLME(
+  dat           = dat_sub,
+  formula_str   = "~ treatment * visit + age + sex + rNANgUl + percent_duplication + median_cv_coverage + (1|ptID)",
+  model_weights = TRUE,
+  run_contrast  = TRUE,
+  contrast_vars = "treatment:visit",   # single ":" string → Branch A
+  contrast_spec = my_spec,             # the filtered data.frame from geneLME_contrast_spec()
+  n_cores       = 2
+)
+```
+
+## Output structure
+
+```{r branch-a-output-structure}
+cat("Output elements:", paste(names(result_A), collapse = ", "), "\n\n")
+
+cat("lme_fit (AIC per gene):\n")
+print(result_A$lme_fit)
+
+cat("\nModel status summary:\n")
+print(table(result_A$lme_err))
+
+# $contrast_spec is the indexed copy of my_spec attached by geneLME().
+# contrast_index here is 1:nrow(my_spec) — the row position within the filtered
+# spec. This is the stable index you should use when building contrasts_secondary vectors.
+cat("\n$contrast_spec (indexed by geneLME):\n")
+print(result_A$contrast_spec)
+```
+
+## `lme_anova` — ANOVA table
+
+One row per model term per gene. `predictor_class` classifies each term, and `Estimate_source`
+indicates whether a coefficient estimate is available directly (`"lme_summary"`) or should be
+read from the contrast output (`"seeContrasts"`). `p.value_adj` is the FDR-adjusted p-value
+computed across all genes **within each model term** (Benjamini-Hochberg by default).
+
+```{r branch-a-anova}
+cat("ANOVA rows:", nrow(result_A$lme_anova), "\n")
+cat("  (", length(unique(result_A$lme_anova$term)), "terms ×",
+    length(unique(result_A$lme_anova$gene)), "genes)\n\n")
+
+# Show one gene in full
+result_A$lme_anova %>%
+  filter(gene == "gene01") %>%
+  select(term, statistic, df, p.value, p.value_adj, predictor_class, Estimate_source, Estimate, Estimate_SE)
+```
+
+## `lme_contrast` — contrast results
+
+One row per defined contrast per gene. `contrast_order` is always `"first_order"` in a basic
+Branch A call (no second-order contrasts specified). `p.value_adj` is FDR-adjusted across all
+genes **within each contrast × contrast_order combination**.
+
+`contrast_ref` and `contrast_lvl` are populated for **Branch A first-order contrasts** —
+they record exactly which interaction cell is the reference (−1) and which is the comparison
+(+1), eliminating any ambiguity in how the estimate is signed. For second-order contrasts and
+all Branch B contrasts these columns are `NA` (no single ref/lvl pair applies).
+
+```{r branch-a-contrast}
+cat("Contrast rows:", nrow(result_A$lme_contrast), "\n")
+cat("  (", length(unique(result_A$lme_contrast$contrast)), "contrasts ×",
+    length(unique(result_A$lme_contrast$gene)), "genes)\n\n")
+
+result_A$lme_contrast %>%
+  filter(gene == "gene01") %>%
+  select(contrast, contrast_ref, contrast_lvl, estimate, SE, df, t.ratio, p.value, p.value_adj, contrast_order)
+```
+
+Notice that gene01 shows large, significant effects at V3 (TrtC vs others) but not at V2,
+consistent with the simulated `TrtC:V3` upregulation.
+
+---
+
+# Branch A: Adding Second-Order Contrasts
+
+Second-order contrasts are contrasts-of-contrasts: each operates on the vector of first-order
+contrast estimates, allowing you to ask whether a treatment difference *changes* across visits.
+
+At validation time, `geneLME()` prints the numbered first-order list in `contrast_spec` row
+order, so you can verify the position indices before constructing your secondary vectors.
+**Secondary vectors must have length equal to `nrow(contrast_spec)`**.
+
+```{r branch-a-second-order}
+# At validation time, geneLME() prints the first-order contrast list in my_spec row
+# order. You can also inspect result_A$contrast_spec for the indexed row ordering.
+# With my_spec as defined above (same-visit, V2 and V3), alphabetical ordering gives:
+#  row 1: TrtB V2 - TrtA V2
+#  row 2: TrtC V2 - TrtA V2
+#  row 3: TrtC V2 - TrtB V2
+#  row 4: TrtB V3 - TrtA V3
+#  row 5: TrtC V3 - TrtA V3
+#  row 6: TrtC V3 - TrtB V3
+#
+# Second-order questions:
+#   "Did the TrtA vs TrtB difference change from V2 to V3?"  → row4 − row1
+#   "Did the TrtA vs TrtC difference change from V2 to V3?"  → row5 − row2
+#
+# Verify with: result_A$contrast_spec
+
+result_A2 <- geneLME(
+  dat                 = dat_sub,
+  formula_str         = "~ treatment * visit + age + sex + rNANgUl + percent_duplication + median_cv_coverage + (1|ptID)",
+  model_weights       = TRUE,
+  run_contrast        = TRUE,
+  contrast_vars       = "treatment:visit",
+  contrast_spec       = my_spec,
+  contrasts_secondary = list(
+    "TrtA vs TrtB: V3 minus V2 effect" = c(-1, 0, 0, 1, 0, 0),  # row4 − row1
+    "TrtA vs TrtC: V3 minus V2 effect" = c(0, -1, 0, 0, 1, 0)   # row5 − row2
+  ),
+  n_cores             = 2
+)
+```
+
+```{r branch-a-second-order-output}
+cat("Contrast order breakdown:\n")
+print(table(result_A2$lme_contrast$contrast_order))
+
+cat("\nSecond-order results for gene01 and gene09 (strongest TrtC:V3 effect):\n")
+# contrast_ref/contrast_lvl are NA for second-order rows (no single ref/lvl pair)
+result_A2$lme_contrast %>%
+  filter(contrast_order == "second_order", gene %in% c("gene01", "gene09")) %>%
+  select(gene, contrast, contrast_ref, contrast_lvl, estimate, SE, df, t.ratio, p.value)
+```
+
+## Programmatic second-order contrast construction via `$contrast_spec`
+
+When there are many first-order contrasts, hand-coding the position of each `−1`/`+1` in
+every secondary vector is error-prone. After a successful `geneLME()` call (or a soft-fail
+call — see [Input Validation]), the `$contrast_spec` element of the returned list contains
+an indexed copy of `contrast_spec` with a `contrast_index` column added by `geneLME()`.
+`contrast_index` is simply `1:nrow(contrast_spec)` — the row positions in the filtered spec
+you passed in. Use these as stable handles when building `contrasts_secondary` vectors
+programmatically.
+
+**Workflow:** run `geneLME()` once (or use a dry-run via a wrong-length `contrasts_secondary`
+soft-fail), inspect `result$contrast_spec` to confirm the row ordering and indices, then build
+and pass the correct `contrasts_secondary` list.
+
+**Example scenario:** within each treatment pair, ask whether the between-treatment difference
+changed from V2 to V3 — i.e., `(TrtX−TrtY at V3) − (TrtX−TrtY at V2)`.
+
+```{r secondary-contrasts-programmatic}
+# result_A$contrast_spec is the indexed version of my_spec as seen by geneLME().
+# contrast_index = 1:nrow(my_spec) (simple row positions after filtering).
+cat("Indexed contrast_spec from result_A:\n")
+print(result_A$contrast_spec)
+
+# Annotate with the visit for each contrast (extracted from the interaction label)
+indexed_spec <- result_A$contrast_spec %>%
+  mutate(visit = sub(".* ", "", contrast_ref))   # extract visit from the interaction label
+
+print(indexed_spec)
+```
+
+```{r secondary-contrasts-build}
+# Build a two-column lookup: one contrast_index per sign, one row per second-order contrast.
+# group_by the treatment pair (shared across visits); within each group there are exactly
+# two rows — one for V2 and one for V3 — giving the index_neg (V2, subtracted) and
+# index_pos (V3, added).
+secondary_lookup <- indexed_spec %>%
+  # Create a treatment-pair label that is the same regardless of visit
+  mutate(trt_pair = paste(sub(" .*", "", contrast_ref),  # var_a from ref
+                          sub(" .*", "", contrast_lvl),  # var_a from lvl
+                          sep = " vs ")) %>%
+  arrange(trt_pair, visit) %>%          # V2 before V3 (alphabetical)
+  group_by(trt_pair) %>%
+  summarise(
+    secondary_contrast_name = paste0("(", last(contrast_lvl), " - ", last(contrast_ref), ")",
+                                     " - ",
+                                     "(", first(contrast_lvl), " - ", first(contrast_ref), ")"),
+    index_neg = first(contrast_index),  # V2 row → subtracted (−1)
+    index_pos = last(contrast_index),   # V3 row → added    (+1)
+    .groups = "drop"
+  )
+
+print(secondary_lookup)
+```
+
+```{r secondary-contrasts-format}
+# Format as a named list of zero vectors with −1/+1 placed by contrast_index.
+# The vector length must equal nrow(my_spec) — the number of first-order contrasts.
+n_first_order <- nrow(my_spec)
+
+contrasts_secondary_prog <- setNames(
+  lapply(seq_len(nrow(secondary_lookup)), function(i) {
+    v <- rep(0, n_first_order)
+    # contrast_index IS the row position (1:nrow), so it can be used directly.
+    # Using which() for robustness in case the data.frame is reordered.
+    v[which(indexed_spec$contrast_index == secondary_lookup$index_neg[i])] <- -1
+    v[which(indexed_spec$contrast_index == secondary_lookup$index_pos[i])] <-  1
+    v
+  }),
+  secondary_lookup$secondary_contrast_name
+)
+
+# Inspect: each vector should have exactly one −1 and one +1
+print(contrasts_secondary_prog)
+```
+
+```{r secondary-contrasts-run}
+result_A_prog <- geneLME(
+  dat                 = dat_sub,
+  formula_str         = "~ treatment * visit + age + sex + rNANgUl + percent_duplication + median_cv_coverage + (1|ptID)",
+  model_weights       = TRUE,
+  run_contrast        = TRUE,
+  contrast_vars       = "treatment:visit",
+  contrast_spec       = my_spec,
+  contrasts_secondary = contrasts_secondary_prog,
+  n_cores             = 2
+)
+
+cat("Second-order results for gene01:\n")
+result_A_prog$lme_contrast %>%
+  filter(contrast_order == "second_order", gene == "gene01") %>%
+  select(gene, contrast, contrast_ref, contrast_lvl, estimate, SE, df, t.ratio, p.value)
+```
+
+> **Key design note:** `geneLME()` appends `contrast_index` (= `1:nrow(contrast_spec)`) to its
+> `$contrast_spec` output element — not to the `contrast_spec` data frame you pass in. This
+> means `contrast_index` always reflects the row positions in *your filtered spec*, never in
+> the full unfiltered template. The `which(indexed_spec$contrast_index == ...)` lookup maps
+> those indices back to row positions for vector construction, and is robust to any reordering
+> of the spec data frame.
+
+---
+
+# Branch B: Non-Interaction Contrasts
+
+**Use when:** the model is additive (no interaction term), and you want named contrasts on the
+marginal means of one variable. Optionally, compute those contrasts within specific levels of a
+second grouping variable (`contrast_var_2_levels`), and optionally follow up with second-order
+contrasts across the primary contrast estimates.
+
+Under the hood, `geneLME_fit()` calls `emmeans()` with a `spec` formula derived from
+`contrast_vars`, using `contrast_var_2_levels` as the `at =` filter. `contrasts_primary`
+vectors are passed directly to `emmeans::contrast()`.
+
+## Inspecting levels before building contrast vectors
+
+Before specifying `contrasts_primary`, confirm the level ordering emmeans will use — it is
+alphabetical by default:
+
+```{r branch-b-spec}
+ref_B <- geneLME_contrast_spec(dat$targets, contrast_vars = c("treatment", "visit"))
+```
+
+`treatment` levels are `TrtA[1]`, `TrtB[2]`, `TrtC[3]` — so `contrasts_primary` vectors
+must have length 3 with positions corresponding to those labels:
+
+```
+"TrtC vs TrtA" = c(-1, 0, 1)   # TrtA=−1, TrtB=0, TrtC=+1
+"TrtB vs TrtA" = c(-1, 1, 0)   # TrtA=−1, TrtB=+1, TrtC=0
+```
+
+## Basic Branch B call
+
+```{r branch-b}
+result_B <- geneLME(
+  dat                   = dat_sub,
+  formula_str           = "~ treatment + visit + age + sex + rNANgUl + percent_duplication + median_cv_coverage + (1|ptID)",
+  model_weights         = TRUE,
+  run_contrast          = TRUE,
+  contrast_vars         = c("treatment", "visit"),  # [1] primary; [2] 'by' grouping variable
+  contrast_var_2_levels = c("V2", "V3"),            # restrict to these visit levels
+  contrasts_primary     = list(
+    "TrtC vs TrtA" = c(-1, 0, 1),
+    "TrtB vs TrtA" = c(-1, 1, 0)
+  ),
+  n_cores               = 2
+)
+```
+
+```{r branch-b-output}
+cat("Contrast rows:", nrow(result_B$lme_contrast), "\n")
+cat("  (", length(unique(result_B$lme_contrast$contrast)), "contrasts ×",
+    length(contrast_var_2_levels <- c("V2","V3")), "visits ×",
+    length(unique(result_B$lme_contrast$gene)), "genes)\n\n")
+
+# contrast_ref and contrast_lvl are NA for Branch B (named contrast vectors,
+# not a ref/lvl spec frame)
+result_B$lme_contrast %>%
+  filter(gene == "gene01") %>%
+  select(contrast, contrast_ref, contrast_lvl, visit, estimate, SE, df, t.ratio, p.value, contrast_order)
+```
+
+> **Note:** In an additive model, treatment estimates are identical across V2 and V3 — there is
+> no interaction, so the treatment effect does not depend on visit. `contrast_var_2_levels`
+> controls *which* visit cells are included in the output, which is useful for limiting the
+> number of tests and focusing results on visits of biological interest.
+
+## Branch B with second-order contrasts
+
+A second-order contrast operates on the vector of first-order contrast estimates. Here,
+`contrasts_secondary` must have length equal to the number of primary contrasts (2 in this
+example). The result asks: "Is the `TrtC vs TrtA` difference significantly larger than the
+`TrtB vs TrtA` difference?" — i.e., is there a differential treatment response between TrtB
+and TrtC relative to TrtA?
+
+```{r branch-b-second-order}
+result_B2 <- geneLME(
+  dat                   = dat_sub,
+  formula_str           = "~ treatment + visit + age + sex + rNANgUl + percent_duplication + median_cv_coverage + (1|ptID)",
+  model_weights         = TRUE,
+  run_contrast          = TRUE,
+  contrast_vars         = c("treatment", "visit"),
+  contrast_var_2_levels = c("V2", "V3"),
+  contrasts_primary     = list(
+    "TrtC vs TrtA" = c(-1, 0, 1),
+    "TrtB vs TrtA" = c(-1, 1, 0)
+  ),
+  contrasts_secondary   = list(
+    "TrtC vs TrtB (2nd order)" = c(1, -1)  # length = n primary contrasts (2)
+  ),
+  n_cores               = 2
+)
+```
+
+```{r branch-b-second-order-output}
+cat("Contrast order breakdown:\n")
+print(table(result_B2$lme_contrast$contrast_order))
+
+result_B2$lme_contrast %>%
+  filter(gene == "gene01") %>%
+  select(contrast, contrast_ref, contrast_lvl, visit, estimate, SE, df, t.ratio, p.value, contrast_order)
+```
+
+---
+
+# FDR Adjustment
+
+`geneLME()` automatically appends a `p.value_adj` column to both `lme_anova` and
+`lme_contrast` using `p.adjust()`. Adjustment is performed **across all genes within each
+grouping unit** — not globally across all rows — so that each test family is treated
+independently:
+
+| Output table  | Grouping unit for adjustment              |
+|---------------|-------------------------------------------|
+| `lme_anova`   | Each model term (e.g. `treatment`, `treatment:visit`) |
+| `lme_contrast`| Each contrast label × `contrast_order`   |
+
+The default method is Benjamini-Hochberg (`"BH"`). Any method accepted by `p.adjust()` can
+be specified via the `fdr_method` argument:
+
+```{r fdr-methods}
+# Available methods
+p.adjust.methods
+```
+
+```{r fdr-custom}
+# Example: Bonferroni correction instead of BH
+result_bonf <- geneLME(
+  dat           = dat_sub,
+  formula_str   = "~ treatment * visit + age + sex + rNANgUl + percent_duplication + median_cv_coverage + (1|ptID)",
+  model_weights = TRUE,
+  run_contrast  = TRUE,
+  contrast_vars = "treatment:visit",
+  contrast_spec = my_spec,
+  fdr_method    = "bonferroni",
+  n_cores       = 2
+)
+
+# Compare BH vs Bonferroni for one contrast across genes
+comparison <- result_A$lme_contrast %>%
+  filter(contrast == first(contrast), contrast_order == "first_order") %>%
+  select(gene, p.value, p.value_adj_BH = p.value_adj) %>%
+  left_join(
+    result_bonf$lme_contrast %>%
+      filter(contrast == first(contrast), contrast_order == "first_order") %>%
+      select(gene, p.value_adj_bonf = p.value_adj),
+    by = "gene"
+  )
+
+print(comparison)
+```
+
+> **Note on NA values:** genes whose models failed receive `NA` for `p.value`, which
+> propagates to `p.value_adj`. These genes are excluded from the adjustment set, so the
+> effective number of tests equals the number of successfully fitted genes.
+
+---
+
+# Input Validation
+
+`geneLME()` validates all inputs before launching any parallel work. Informative errors are
+raised for the most common misspecifications:
+
+```{r validation-errors}
+run_validation_test <- function(label, expr) {
+  tryCatch(
+    { expr; cat(label, "— (no error raised)\n") },
+    error   = function(e) cat(label, "ERROR:\n ", conditionMessage(e), "\n\n"),
+    warning = function(w) cat(label, "WARNING:\n ", conditionMessage(w), "\n\n")
+  )
+}
+
+# 1. Formula variable missing from targets
+run_validation_test("Test 1 — missing formula variable:",
+  geneLME(dat_sub, formula_str = "~ NONEXISTENT_VAR + (1|ptID)", n_cores = 2)
+)
+
+# 2. Weights requested but not present
+dat_no_w <- dat_sub; dat_no_w$weights <- NULL
+run_validation_test("Test 2 — model_weights=TRUE but no dat$weights:",
+  geneLME(dat_no_w, formula_str = "~ treatment + (1|ptID)", model_weights = TRUE, n_cores = 2)
+)
+
+# 3. Interaction contrast requested but interaction not in formula
+run_validation_test("Test 3 — interaction contrast but additive formula:",
+  geneLME(dat_sub,
+          formula_str   = "~ treatment + visit + age + (1|ptID)",
+          run_contrast  = TRUE,
+          contrast_vars = "treatment:visit",
+          contrast_spec = my_spec,
+          n_cores       = 2)
+)
+
+# 4. Interaction contrast but contrast_spec not provided
+run_validation_test("Test 4 — interaction contrast, contrast_spec = NULL:",
+  geneLME(dat_sub,
+          formula_str   = "~ treatment * visit + age + (1|ptID)",
+          run_contrast  = TRUE,
+          contrast_vars = "treatment:visit",
+          n_cores       = 2)
+)
+
+# 5. contrast_spec has wrong column names
+run_validation_test("Test 5 — contrast_spec with wrong columns:",
+  geneLME(dat_sub,
+          formula_str   = "~ treatment * visit + age + (1|ptID)",
+          run_contrast  = TRUE,
+          contrast_vars = "treatment:visit",
+          contrast_spec = data.frame(a = "x", b = "y"),
+          n_cores       = 2)
+)
+
+# 6. contrast_var_2_levels contains an invalid level
+run_validation_test("Test 6 — invalid contrast_var_2_levels:",
+  geneLME(dat_sub,
+          formula_str           = "~ treatment + visit + age + (1|ptID)",
+          run_contrast          = TRUE,
+          contrast_vars         = c("treatment", "visit"),
+          contrast_var_2_levels = c("V2", "NOTAVISIT"),
+          contrasts_primary     = list("TrtC vs TrtA" = c(-1, 0, 1)),
+          n_cores               = 2)
+)
+```
+
+When `contrasts_secondary` vectors have the wrong length, `geneLME()` **soft-fails**: it returns
+early without running any models, but still populates `$contrast_spec` with the indexed row
+ordering. This lets you inspect the indexing and fix your vectors without a hard error.
+
+```{r validation-soft-fail}
+# 7. contrasts_secondary with wrong length → soft-fail with $contrast_spec populated
+bad_result <- geneLME(
+  dat                 = dat_sub,
+  formula_str         = "~ treatment * visit + age + sex + rNANgUl + percent_duplication + median_cv_coverage + (1|ptID)",
+  model_weights       = TRUE,
+  run_contrast        = TRUE,
+  contrast_vars       = "treatment:visit",
+  contrast_spec       = my_spec,
+  contrasts_secondary = list(
+    "wrong length vector" = rep(0, 99)  # should be length 6 = nrow(my_spec)
+  ),
+  n_cores = 2
+)
+
+cat("Elements of soft-fail result:\n")
+print(sapply(bad_result, is.null))   # lme_anova/contrast/fit/err are NULL; contrast_spec is not
+
+cat("\n$contrast_spec (use these indices to fix contrasts_secondary):\n")
+print(bad_result$contrast_spec)
+```
+
+---
+
+# Error Handling and Singular Fits
+
+Per-gene errors are captured by `tryCatch` inside `geneLME_fit()` and do not abort the run.
+Each gene's outcome is recorded in the `model_status` column present in both `lme_anova`
+and `lme_contrast`, and also summarised in `lme_err` (a named character vector keyed by gene):
+
+- **`"success"`** — model converged cleanly; fixed effects and contrasts are fully reliable.
+- **`"singular_fit"`** — `isSingular()` was `TRUE`, meaning the random effect variance hit its
+  boundary (zero). Fixed effect estimates are still returned and are numerically valid, but
+  the random effect structure may be over-specified for the data. Common with small sample sizes.
+  Filter these genes downstream if warranted.
+- Any other value — an unexpected error was caught; rows for that gene will contain NAs.
+
+```{r error-handling}
+# Check model status summary across all genes — Branch A
+cat("Model status — Branch A:\n")
+print(table(result_A$lme_err))
+
+# With small mock data (10 patients), singular fits are expected due to
+# patient-level covariates (sex, age) being collinear with the patient random effect.
+# With real data at typical sample sizes this is less common.
+
+# Identify singular-fit or failed genes
+non_success <- names(result_A$lme_err)[result_A$lme_err != "success"]
+if (length(non_success) > 0) {
+  cat("\nNon-success genes and their status:\n")
+  print(result_A$lme_err[non_success])
+  # For singular fits, results are still returned — filter if desired:
+  # result_A$lme_contrast %>% filter(model_status == "success")
+} else {
+  cat("\nAll genes fitted successfully.\n")
+}
+```
+
+---
+
+# Quick-Reference: Argument Guide
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `dat` | list | Yes | EList-like: `$E`, `$weights` (optional), `$targets` |
+| `formula_str` | character | Yes | RHS formula string, e.g. `"~ treatment * visit + (1\|ptID)"` |
+| `model_weights` | logical | No | `TRUE` to use `dat$weights` as precision weights |
+| `run_contrast` | logical | No | `TRUE` to run emmeans contrasts |
+| `contrast_vars` | character | If `run_contrast=TRUE` | `"var_a:var_b"` (Branch A) or `c("var1", "var2")` (Branch B) |
+| `contrast_var_2_levels` | character vector | No | Branch B: restrict 'by' variable to these levels |
+| `contrast_spec` | data.frame | Required for Branch A | Columns `contrast_ref` and `contrast_lvl`; from `geneLME_contrast_spec()`. `geneLME()` attaches an indexed copy (with `contrast_index`) to `$contrast_spec` in its return value. |
+| `contrasts_primary` | named list | Branch B | Named contrast vectors; length = levels of `contrast_vars[1]` |
+| `contrasts_secondary` | named list | No | Second-order contrasts; length = `nrow(contrast_spec)` (Branch A) or `length(contrasts_primary)` (Branch B). Wrong lengths trigger a soft-fail with `$contrast_spec` populated for debugging. |
+| `fdr_method` | character | No | P-value adjustment method passed to `p.adjust()`; default `"BH"` (Benjamini-Hochberg) |
+| `n_cores` | integer | No | Number of parallel workers; defaults to `detectCores() − 4` |
+
+---
+
+# Session Info
+
+```{r session-info}
+sessionInfo()
+```
