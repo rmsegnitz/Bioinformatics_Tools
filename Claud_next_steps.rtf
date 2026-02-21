@@ -1,0 +1,38 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2822
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;\f1\fmodern\fcharset0 Courier;}
+{\colortbl;\red255\green255\blue255;\red38\green38\blue38;\red255\green255\blue255;}
+{\*\expandedcolortbl;;\cssrgb\c20000\c20000\c20000;\cssrgb\c100000\c100000\c100000;}
+\margl1440\margr1440\vieww13240\viewh11160\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 # Notes for next session\
+Check your CLAUDE_NOTES and familiarize yourself with geneLME_dev.R and geneLME_dev2.R\
+\
+\
+Pick up with: verifying and validating the dev2 version. I have tested this and still encountered errors stemming from functions not explicitly called from required packages (eg. Line 849: plan(multisession, workers=workers). I corrected this where I could find it, but please review and make sure my specifications are valid and correct all such instances. If needed, should we add explicit package calling to anyplace that non base functions are called?\
+\
+I\'92d also like you to please edit the functions to silence internal warnings such as \'93
+\f1\fs26 \cf2 \cb3 \expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 ## Warning: package \'91lme4\'92 was built under R version 4.5.2\'94
+\f0\fs24 \cf0 \cb1 \kerning1\expnd0\expndtw0 \outl0\strokewidth0  or other messages about package versioning. \
+\
+I\'92ve also encountered the warnings \
+\'93
+\f1\fs26 \cf2 \cb3 \expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 Warning: Some predictor variables are on very different scales: consider rescaling. \
+\pard\pardeftab720\partightenfactor0
+\cf2 \cb3 \strokec2 ## You may also use (g)lmerControl(autoscale = TRUE) to improve numerical stability.\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 \cb1 \kerning1\expnd0\expndtw0 \outl0\strokewidth0 \'93\
+\
+This may be good rational for setting \'93
+\f1\fs26 \cf2 \cb3 \expnd0\expndtw0\kerning0
+lmerControl(autoscale = TRUE)\'94
+\f0\fs24 \cf0 \cb1 \kerning1\expnd0\expndtw0  internally, though I had thought this was the default behavior in lme4 now. If indeed it is, then we should certainly silence that. \
+\
+Once the dev2 version has been more thoroughly debugged, it can be merged into the main geneLME.R script.\
+\
+\
+\
+}

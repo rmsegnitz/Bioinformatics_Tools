@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>geneLME — Function Overview</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {  background-color: #f8f8f8; }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ef2929; } /* Alert */
+    code span.an { color: #8f5902; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #204a87; } /* Attribute */
+    code span.bn { color: #0000cf; } /* BaseN */
+    code span.cf { color: #204a87; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4e9a06; } /* Char */
+    code span.cn { color: #8f5902; } /* Constant */
+    code span.co { color: #8f5902; font-style: italic; } /* Comment */
+    code span.cv { color: #8f5902; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #8f5902; font-weight: bold; font-style: italic; } /* Documentation */
+    code span.dt { color: #204a87; } /* DataType */
+    code span.dv { color: #0000cf; } /* DecVal */
+    code span.er { color: #a40000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #0000cf; } /* Float */
+    code span.fu { color: #204a87; font-weight: bold; } /* Function */
+    code span.im { } /* Import */
+    code span.in { color: #8f5902; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #204a87; font-weight: bold; } /* Keyword */
+    code span.op { color: #ce5c00; font-weight: bold; } /* Operator */
+    code span.ot { color: #8f5902; } /* Other */
+    code span.pp { color: #8f5902; font-style: italic; } /* Preprocessor */
+    code span.sc { color: #ce5c00; font-weight: bold; } /* SpecialChar */
+    code span.ss { color: #4e9a06; } /* SpecialString */
+    code span.st { color: #4e9a06; } /* String */
+    code span.va { color: #000000; } /* Variable */
+    code span.vs { color: #4e9a06; } /* VerbatimString */
+    code span.wa { color: #8f5902; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  <link rel="stylesheet" href="" />
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">geneLME — Function Overview</h1>
+</header>
+<nav id="TOC" role="doc-toc">
+<h2 id="toc-title">Contents</h2>
+<ul>
+<li><a href="#genelme-function-overview"
+id="toc-genelme-function-overview">geneLME — Function Overview</a>
+<ul>
+<li><a href="#function-map" id="toc-function-map">Function Map</a></li>
+<li><a href="#genelme_contrast_spectargets-contrast_vars"
+id="toc-genelme_contrast_spectargets-contrast_vars"><code>geneLME_contrast_spec(targets, contrast_vars)</code></a>
+<ul>
+<li><a href="#interaction-mode" id="toc-interaction-mode">Interaction
+mode</a></li>
+<li><a href="#single-multi-variable-mode"
+id="toc-single-multi-variable-mode">Single / multi-variable
+mode</a></li>
+</ul></li>
+<li><a href="#genelme-main-function"
+id="toc-genelme-main-function"><code>geneLME()</code> — Main
+Function</a>
+<ul>
+<li><a href="#signature" id="toc-signature">Signature</a></li>
+<li><a href="#input" id="toc-input">Input</a></li>
+<li><a href="#output" id="toc-output">Output</a></li>
+<li><a href="#validation-checks-pre-flight"
+id="toc-validation-checks-pre-flight">Validation Checks
+(pre-flight)</a></li>
+</ul></li>
+<li><a href="#branch-a-interaction-contrasts"
+id="toc-branch-a-interaction-contrasts">Branch A — Interaction
+Contrasts</a>
+<ul>
+<li><a href="#step-1-generate-and-filter-the-contrast-template"
+id="toc-step-1-generate-and-filter-the-contrast-template">Step 1 —
+Generate and filter the contrast template</a></li>
+<li><a href="#step-2-run" id="toc-step-2-run">Step 2 — Run</a></li>
+<li><a href="#sample-lme_contrast-output-6-contrasts-n-genes-rows"
+id="toc-sample-lme_contrast-output-6-contrasts-n-genes-rows">Sample
+<code>lme_contrast</code> output (6 contrasts × n genes rows)</a></li>
+</ul></li>
+<li><a href="#branch-a-with-second-order-contrasts"
+id="toc-branch-a-with-second-order-contrasts">Branch A with Second-Order
+Contrasts</a></li>
+<li><a href="#branch-b-non-interaction-contrasts"
+id="toc-branch-b-non-interaction-contrasts">Branch B — Non-Interaction
+Contrasts</a>
+<ul>
+<li><a href="#step-1-inspect-levels" id="toc-step-1-inspect-levels">Step
+1 — Inspect levels</a></li>
+<li><a href="#step-2-run-1" id="toc-step-2-run-1">Step 2 — Run</a></li>
+<li><a
+href="#sample-lme_contrast-output-per-gene-2-primary-2-visits-1-secondary-2-visits-6-rows"
+id="toc-sample-lme_contrast-output-per-gene-2-primary-2-visits-1-secondary-2-visits-6-rows">Sample
+<code>lme_contrast</code> output (per gene: 2 primary × 2 visits + 1
+secondary × 2 visits = 6 rows)</a></li>
+</ul></li>
+<li><a href="#lme_anova-output-structure"
+id="toc-lme_anova-output-structure"><code>lme_anova</code> Output
+Structure</a></li>
+<li><a href="#error-handling-and-singular-fits"
+id="toc-error-handling-and-singular-fits">Error Handling and Singular
+Fits</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 id="genelme-function-overview">geneLME — Function Overview</h1>
+<blockquote>
+<p><strong>Companion to:</strong> <code>geneLME.R</code> <strong>Last
+updated:</strong> 2026-02-20 For session continuity notes see
+<code>CLAUDE_NOTES_geneLME.md</code>. For a worked tutorial with output
+see <code>geneLME_tutorial.html</code> (knitted from
+<code>geneLME_tutorial.Rmd</code>).</p>
+</blockquote>
+<hr />
+<h2 id="function-map">Function Map</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Function</th>
+<th>Role</th>
+<th>Called by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>geneLME_contrast_spec()</code></td>
+<td>Pre-run helper: inspect available contrast levels and understand how
+to specify arguments</td>
+<td>User</td>
+</tr>
+<tr>
+<td><code>geneLME_build_contrast_args()</code></td>
+<td>Branch A helper: pre-computes <code>contrasts_list</code> +
+<code>spec_lookup</code> once before parallel dispatch</td>
+<td><code>geneLME()</code></td>
+</tr>
+<tr>
+<td><code>geneLME()</code></td>
+<td>User-facing entry point: validates inputs, slices data, sets
+parallel plan</td>
+<td>User</td>
+</tr>
+<tr>
+<td><code>geneLME_dispatch()</code></td>
+<td>Launches <code>future_lapply</code> with explicit globals; clean
+parallel scope</td>
+<td><code>geneLME()</code></td>
+</tr>
+<tr>
+<td><code>geneLME_fit()</code></td>
+<td>Per-gene worker: fits <code>lmer</code>, extracts ANOVA +
+contrasts</td>
+<td><code>geneLME_dispatch()</code></td>
+</tr>
+<tr>
+<td><code>geneLME_compiler()</code></td>
+<td>Binds per-gene list results into four output data frames</td>
+<td><code>geneLME()</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2
+id="genelme_contrast_spectargets-contrast_vars"><code>geneLME_contrast_spec(targets, contrast_vars)</code></h2>
+<p>A pre-run helper to enumerate available levels and understand how to
+construct contrast arguments before calling <code>geneLME()</code>. Two
+modes:</p>
+<h3 id="interaction-mode">Interaction mode</h3>
+<p><code>contrast_vars</code> is a single <code>"var_a:var_b"</code>
+string. Returns a <code>data.frame(contrast_ref, contrast_lvl)</code>
+with all pairwise combinations of interaction cells. The user filters
+this to their contrasts of interest and passes it directly as
+<code>contrast_spec</code> to <code>geneLME()</code>.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>spec_template <span class="ot">&lt;-</span> <span class="fu">geneLME_contrast_spec</span>(dat<span class="sc">$</span>targets, <span class="at">contrast_vars =</span> <span class="st">&quot;treatment:visit&quot;</span>)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="co"># → data.frame with 66 rows (all pairs of 12 interaction cells)</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co">#    contrast_ref contrast_lvl</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># 1      TrtA V1      TrtB V1</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="co"># 2      TrtA V1      TrtC V1</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="co"># ...</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>my_spec <span class="ot">&lt;-</span> spec_template <span class="sc">%&gt;%</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">sub</span>(<span class="st">&quot;.* &quot;</span>, <span class="st">&quot;&quot;</span>, contrast_ref) <span class="sc">==</span> <span class="fu">sub</span>(<span class="st">&quot;.* &quot;</span>, <span class="st">&quot;&quot;</span>, contrast_lvl),  <span class="co"># same visit</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>         <span class="fu">sub</span>(<span class="st">&quot;.* &quot;</span>, <span class="st">&quot;&quot;</span>, contrast_ref) <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;V2&quot;</span>, <span class="st">&quot;V3&quot;</span>))               <span class="co"># only V2, V3</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="co"># → 6 rows: the 3 cross-treatment pairs at V2, and 3 at V3</span></span></code></pre></div>
+<h3 id="single-multi-variable-mode">Single / multi-variable mode</h3>
+<p><code>contrast_vars</code> is a character vector of one or more plain
+variable names (no <code>:</code>). Returns a <strong>named
+list</strong>, one <code>data.frame(level)</code> per variable. A
+message for each variable explains its role in subsequent
+<code>geneLME()</code> arguments. This list is a reference only — not
+passed to <code>geneLME()</code>.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>ref <span class="ot">&lt;-</span> <span class="fu">geneLME_contrast_spec</span>(dat<span class="sc">$</span>targets, <span class="at">contrast_vars =</span> <span class="fu">c</span>(<span class="st">&quot;treatment&quot;</span>, <span class="st">&quot;visit&quot;</span>))</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Message for treatment (position 1 — primary):</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co"># &#39;treatment&#39; — primary contrast variable (contrast_vars[1] in geneLME).</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co"># 3 levels (alphabetical order = position order for contrasts_primary vectors):</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co"># 1. TrtA   2. TrtB   3. TrtC</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co"># → contrast vectors passed to contrasts_primary must have length 3</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="co">#   e.g. &#39;TrtC vs TrtA&#39; = c(-1, 0, 1)</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Message for visit (position 2 — secondary &#39;by&#39; variable):</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co"># &#39;visit&#39; — secondary &#39;by&#39; grouping variable (contrast_vars[2] in geneLME).</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="co"># 4 levels: V1, V2, V3, V4</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="co"># → pass a subset to contrast_var_2_levels in geneLME() to restrict</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="co">#   which groups the primary contrasts are computed within.</span></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>ref<span class="sc">$</span>treatment   <span class="co"># data.frame: TrtA, TrtB, TrtC</span></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>ref<span class="sc">$</span>visit       <span class="co"># data.frame: V1, V2, V3, V4</span></span></code></pre></div>
+<p><strong>Note:</strong> mixing interaction and plain variable names in
+one call raises an error — call separately.</p>
+<hr />
+<h2 id="genelme-main-function"><code>geneLME()</code> — Main
+Function</h2>
+<h3 id="signature">Signature</h3>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">geneLME</span>(dat, formula_str,</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>        <span class="at">model_weights         =</span> <span class="cn">NULL</span>,</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>        <span class="at">run_contrast          =</span> <span class="cn">NULL</span>,</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>        <span class="at">contrast_vars         =</span> <span class="cn">NULL</span>,</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>        <span class="at">contrast_var_2_levels =</span> <span class="cn">NULL</span>,</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>        <span class="at">contrast_spec         =</span> <span class="cn">NULL</span>,</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>        <span class="at">contrasts_primary     =</span> <span class="cn">NULL</span>,</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>        <span class="at">contrasts_secondary   =</span> <span class="cn">NULL</span>,</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>        <span class="at">fdr_method            =</span> <span class="st">&quot;BH&quot;</span>,   <span class="co"># any method accepted by p.adjust()</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>        <span class="at">n_cores               =</span> <span class="cn">NULL</span>)</span></code></pre></div>
+<h3 id="input">Input</h3>
+<p><code>dat</code> — EList-like list with three elements:</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Element</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dat$E</code></td>
+<td>matrix (genes × samples)</td>
+<td>log2 expression values</td>
+</tr>
+<tr>
+<td><code>dat$weights</code></td>
+<td>matrix (genes × samples), optional</td>
+<td>voom precision weights</td>
+</tr>
+<tr>
+<td><code>dat$targets</code></td>
+<td>data.frame (samples × covariates)</td>
+<td>sample metadata; all formula and contrast variables must be columns
+here</td>
+</tr>
+</tbody>
+</table>
+<h3 id="output">Output</h3>
+<p>Named list of five elements:</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Element</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>lme_anova</code></td>
+<td>One row per model term per gene: <code>term</code>,
+<code>statistic</code>, <code>df</code>, <code>p.value</code>,
+<code>p.value_adj</code> (FDR within term), <code>gene</code>,
+<code>model_status</code>, <code>predictor_class</code>,
+<code>Estimate</code>, <code>Estimate_SE</code></td>
+</tr>
+<tr>
+<td><code>lme_contrast</code></td>
+<td>One row per contrast per gene: <code>contrast</code>,
+<code>contrast_ref</code>, <code>contrast_lvl</code> (Branch A
+first-order only; NA otherwise), <code>estimate</code>, <code>SE</code>,
+<code>df</code>, <code>t.ratio</code>, <code>p.value</code>,
+<code>p.value_adj</code> (FDR within contrast × order),
+<code>contrast_order</code> (<code>"first_order"</code> /
+<code>"second_order"</code>), <code>gene</code>. Branch B also has a
+<code>visit</code> column.</td>
+</tr>
+<tr>
+<td><code>lme_fit</code></td>
+<td>One row per gene: <code>gene</code>, <code>AIC</code></td>
+</tr>
+<tr>
+<td><code>lme_err</code></td>
+<td>Named character vector: gene → <code>"success"</code>,
+<code>"singular_fit"</code>, or unexpected error message. A
+<code>model_status</code> column carrying the same value also appears in
+<code>lme_anova</code> and <code>lme_contrast</code>.</td>
+</tr>
+<tr>
+<td><code>contrast_spec</code></td>
+<td>Indexed copy of the filtered <code>contrast_spec</code> (Branch A)
+or <code>data.frame(contrast_index, contrast_name)</code> from
+<code>contrasts_primary</code> names (Branch B); <code>NULL</code> when
+no contrasts run. On soft-fail (wrong-length
+<code>contrasts_secondary</code>), all other elements are NULL and only
+this is returned.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="validation-checks-pre-flight">Validation Checks
+(pre-flight)</h3>
+<ol type="1">
+<li>All formula variables present in <code>dat$targets</code></li>
+<li><code>dat$weights</code> present and dimension-matched if
+<code>model_weights = TRUE</code></li>
+<li><code>contrast_vars</code> not NULL when
+<code>run_contrast = TRUE</code></li>
+<li><strong>Interaction term present in formula</strong> if
+<code>contrast_vars</code> contains <code>:</code> (hard error —
+<code>emmeans</code> would otherwise silently use additive margins,
+which is statistically misleading)</li>
+<li><code>contrast_spec</code> required (not NULL) when
+<code>contrast_vars</code> contains <code>:</code></li>
+<li><code>contrast_spec</code> has correct columns
+(<code>contrast_ref</code>, <code>contrast_lvl</code>)</li>
+<li>All <code>contrast_vars</code> component variables present in
+<code>dat$targets</code></li>
+<li><code>contrast_var_2_levels</code> values valid against actual data
+levels</li>
+<li><code>fdr_method</code> validated against
+<code>p.adjust.methods</code></li>
+<li><strong><code>contrasts_secondary</code> vector lengths</strong>
+(soft-fail, not hard stop): each vector must have length ==
+<code>nrow(contrast_spec)</code> (Branch A) or
+<code>length(contrasts_primary)</code> (Branch B). On mismatch returns
+early with only <code>$contrast_spec</code> populated.</li>
+<li>Warn on likely ID columns used as predictors</li>
+</ol>
+<hr />
+<h2 id="branch-a-interaction-contrasts">Branch A — Interaction
+Contrasts</h2>
+<p><strong>When to use:</strong> model formula contains an interaction
+term (<code>treatment * visit</code> or <code>treatment:visit</code>)
+and you want specific pairwise contrasts across particular interaction
+cells.</p>
+<h3 id="step-1-generate-and-filter-the-contrast-template">Step 1 —
+Generate and filter the contrast template</h3>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>spec_template <span class="ot">&lt;-</span> <span class="fu">geneLME_contrast_spec</span>(dat<span class="sc">$</span>targets, <span class="st">&quot;treatment:visit&quot;</span>)</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Returns data.frame of all 66 pairwise interaction cell combinations</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>my_spec <span class="ot">&lt;-</span> spec_template <span class="sc">%&gt;%</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">sub</span>(<span class="st">&quot;.* &quot;</span>, <span class="st">&quot;&quot;</span>, contrast_ref) <span class="sc">==</span> <span class="fu">sub</span>(<span class="st">&quot;.* &quot;</span>, <span class="st">&quot;&quot;</span>, contrast_lvl),  <span class="co"># same visit only</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>         <span class="fu">sub</span>(<span class="st">&quot;.* &quot;</span>, <span class="st">&quot;&quot;</span>, contrast_ref) <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;V2&quot;</span>, <span class="st">&quot;V3&quot;</span>))               <span class="co"># visits V2 and V3 only</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="co"># 6 rows</span></span></code></pre></div>
+<h3 id="step-2-run">Step 2 — Run</h3>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>result_A <span class="ot">&lt;-</span> <span class="fu">geneLME</span>(</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">dat           =</span> dat,</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">formula_str   =</span> <span class="st">&quot;~ treatment * visit + age + sex + rNANgUl + (1|ptID)&quot;</span>,</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">model_weights =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">run_contrast  =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">contrast_vars =</span> <span class="st">&quot;treatment:visit&quot;</span>,   <span class="co"># single &quot;:&quot; string → triggers Branch A</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">contrast_spec =</span> my_spec,             <span class="co"># required; each row defines one contrast</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">n_cores       =</span> <span class="dv">10</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div>
+<h3 id="sample-lme_contrast-output-6-contrasts-n-genes-rows">Sample
+<code>lme_contrast</code> output (6 contrasts × n genes rows)</h3>
+<p><code>contrast_ref</code> = the −1 cell; <code>contrast_lvl</code> =
+the +1 cell. Together they make the sign of <code>estimate</code>
+unambiguous without parsing the contrast label string.</p>
+<pre><code>            contrast   contrast_ref  contrast_lvl  estimate    SE      df   t.ratio  p.value  contrast_order  gene
+TrtB V2 - TrtA V2    TrtA V2        TrtB V2        -0.040    0.960  93.04  -0.042    0.967    first_order     gene01
+TrtC V2 - TrtA V2    TrtA V2        TrtC V2         0.092    0.942  97.37   0.098    0.922    first_order     gene01
+TrtC V2 - TrtB V2    TrtB V2        TrtC V2         0.132    0.993  89.10   0.133    0.894    first_order     gene01
+TrtB V3 - TrtA V3    TrtA V3        TrtB V3         0.191    0.934  98.51   0.205    0.838    first_order     gene01
+TrtC V3 - TrtA V3    TrtA V3        TrtC V3         1.625    0.945  90.82   1.721    0.089    first_order     gene01
+TrtC V3 - TrtB V3    TrtB V3        TrtC V3         1.434    0.958  90.33   1.497    0.138    first_order     gene01</code></pre>
+<hr />
+<h2 id="branch-a-with-second-order-contrasts">Branch A with Second-Order
+Contrasts</h2>
+<p>At validation time, <code>geneLME()</code> prints the numbered
+first-order list (in <code>contrast_spec</code> row order) to guide
+vector construction. Secondary vectors must have length
+<code>nrow(contrast_spec)</code>.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>result_A2 <span class="ot">&lt;-</span> <span class="fu">geneLME</span>(</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">dat                 =</span> dat,</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">formula_str         =</span> <span class="st">&quot;~ treatment * visit + age + sex + rNANgUl + (1|ptID)&quot;</span>,</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">model_weights       =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">run_contrast        =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">contrast_vars       =</span> <span class="st">&quot;treatment:visit&quot;</span>,</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">contrast_spec       =</span> my_spec,          <span class="co"># 6 rows, order defines vector positions</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">contrasts_secondary =</span> <span class="fu">list</span>(</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>    <span class="co"># my_spec rows: 1=TrtB V2-TrtA V2, 2=TrtC V2-TrtA V2, 3=TrtC V2-TrtB V2,</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>    <span class="co">#               4=TrtB V3-TrtA V3, 5=TrtC V3-TrtA V3, 6=TrtC V3-TrtB V3</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;TrtA vs TrtB: V3 vs V2&quot;</span> <span class="ot">=</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">0</span>, <span class="sc">-</span><span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>),   <span class="co"># row1 − row3: V2 vs V3 delta</span></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;TrtA vs TrtC: V3 vs V2&quot;</span> <span class="ot">=</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">1</span>,  <span class="dv">0</span>,<span class="sc">-</span><span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">0</span>)    <span class="co"># row2 − row4</span></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>  ),</span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>  <span class="at">n_cores             =</span> <span class="dv">10</span></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a><span class="co"># lme_contrast: first_order (6 × n_genes) + second_order (2 × n_genes) rows</span></span></code></pre></div>
+<p><strong>Validation message printed:</strong></p>
+<pre><code>contrasts_secondary will be applied to the first-order interaction contrasts
+in the order they appear in contrast_spec (6 contrasts):
+1. TrtB V2 - TrtA V2
+2. TrtC V2 - TrtA V2
+3. TrtC V2 - TrtB V2
+4. TrtB V3 - TrtA V3
+5. TrtC V3 - TrtA V3
+6. TrtC V3 - TrtB V3
+Ensure contrasts_secondary vectors have length 6, with each element
+corresponding to the contrast at that position.</code></pre>
+<hr />
+<h2 id="branch-b-non-interaction-contrasts">Branch B — Non-Interaction
+Contrasts</h2>
+<p><strong>When to use:</strong> model is additive (no interaction), and
+you want named contrasts on the marginal means of one variable,
+optionally evaluated within specific levels of a second variable.</p>
+<h3 id="step-1-inspect-levels">Step 1 — Inspect levels</h3>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>ref <span class="ot">&lt;-</span> <span class="fu">geneLME_contrast_spec</span>(dat<span class="sc">$</span>targets, <span class="at">contrast_vars =</span> <span class="fu">c</span>(<span class="st">&quot;treatment&quot;</span>, <span class="st">&quot;visit&quot;</span>))</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="co"># treatment levels (alphabetical): TrtA[1], TrtB[2], TrtC[3]</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="co"># → contrasts_primary vectors must have length 3, positions = [TrtA, TrtB, TrtC]</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="co"># visit levels: V1, V2, V3, V4 → pass subset to contrast_var_2_levels</span></span></code></pre></div>
+<h3 id="step-2-run-1">Step 2 — Run</h3>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>result_B <span class="ot">&lt;-</span> <span class="fu">geneLME</span>(</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">dat                   =</span> dat,</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">formula_str           =</span> <span class="st">&quot;~ treatment + visit + age + sex + rNANgUl + (1|ptID)&quot;</span>,</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">model_weights         =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">run_contrast          =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">contrast_vars         =</span> <span class="fu">c</span>(<span class="st">&quot;treatment&quot;</span>, <span class="st">&quot;visit&quot;</span>), <span class="co"># [1] = primary; [2] = by-variable</span></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">contrast_var_2_levels =</span> <span class="fu">c</span>(<span class="st">&quot;V2&quot;</span>, <span class="st">&quot;V3&quot;</span>),           <span class="co"># restrict output to these visit levels</span></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">contrasts_primary     =</span> <span class="fu">list</span>(</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;TrtC vs TrtA&quot;</span> <span class="ot">=</span> <span class="fu">c</span>(<span class="sc">-</span><span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">1</span>),  <span class="co"># positions: [TrtA=−1, TrtB=0, TrtC=+1]</span></span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;TrtB vs TrtA&quot;</span> <span class="ot">=</span> <span class="fu">c</span>(<span class="sc">-</span><span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">0</span>)</span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>  ),</span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>  <span class="at">contrasts_secondary   =</span> <span class="fu">list</span>(</span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;TrtC vs TrtB&quot;</span> <span class="ot">=</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="sc">-</span><span class="dv">1</span>)      <span class="co"># length = number of primary contrasts (2)</span></span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>  ),</span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>  <span class="at">n_cores               =</span> <span class="dv">10</span></span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div>
+<h3
+id="sample-lme_contrast-output-per-gene-2-primary-2-visits-1-secondary-2-visits-6-rows">Sample
+<code>lme_contrast</code> output (per gene: 2 primary × 2 visits + 1
+secondary × 2 visits = 6 rows)</h3>
+<pre><code>       contrast  visit   estimate    SE       df   t.ratio  p.value  contrast_order  gene
+TrtC vs TrtA     V2      0.814    0.457  101.6   1.782     0.078    first_order     gene01
+TrtB vs TrtA     V2      0.009    0.457  102.3   0.019     0.984    first_order     gene01
+TrtC vs TrtA     V3      0.814    0.457  101.6   1.782     0.078    first_order     gene01
+TrtB vs TrtA     V3      0.009    0.457  102.3   0.019     0.984    first_order     gene01
+TrtC vs TrtB     V2      0.805    0.462   99.1   1.742     0.085    second_order    gene01
+TrtC vs TrtB     V3      0.805    0.462   99.1   1.742     0.085    second_order    gene01</code></pre>
+<blockquote>
+<p><strong>Note:</strong> In an additive model, estimates are identical
+across V2 and V3 — <code>contrast_var_2_levels</code> restricts
+<em>which</em> visit cells <code>emmeans</code> evaluates at, but since
+there is no interaction the treatment effect is constant across visits.
+This filter is most useful to control the number of output rows and
+limit multiple testing burden.</p>
+</blockquote>
+<hr />
+<h2 id="lme_anova-output-structure"><code>lme_anova</code> Output
+Structure</h2>
+<p>One row per model term per gene. Key columns:</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Column</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>term</code></td>
+<td>Predictor name (e.g. <code>"treatment"</code>,
+<code>"treatment:visit"</code>, <code>"age"</code>)</td>
+</tr>
+<tr>
+<td><code>statistic</code></td>
+<td>Chi-square statistic from <code>car::Anova()</code></td>
+</tr>
+<tr>
+<td><code>df</code></td>
+<td>Degrees of freedom</td>
+</tr>
+<tr>
+<td><code>p.value</code></td>
+<td>p-value</td>
+</tr>
+<tr>
+<td><code>gene</code></td>
+<td>Gene identifier</td>
+</tr>
+<tr>
+<td><code>model_status</code></td>
+<td><code>"success"</code> or error message</td>
+</tr>
+<tr>
+<td><code>predictor_class</code></td>
+<td><code>"continuous"</code>, <code>"two-level-categorical"</code>,
+<code>"multi-level-categorical"</code>, or
+<code>"interaction"</code></td>
+</tr>
+<tr>
+<td><code>Estimate_source</code></td>
+<td><code>"lme_summary"</code> (value in
+<code>Estimate</code>/<code>Estimate_SE</code>) or
+<code>"seeContrasts"</code> (NA — use contrast output for estimate)</td>
+</tr>
+<tr>
+<td><code>Estimate</code></td>
+<td>Coefficient estimate where available; NA for multi-level or complex
+interactions</td>
+</tr>
+<tr>
+<td><code>Estimate_SE</code></td>
+<td>Standard error of estimate where available</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="error-handling-and-singular-fits">Error Handling and Singular
+Fits</h2>
+<p>Per-gene outcomes are tracked via a <code>model_status</code> column
+in both <code>lme_anova</code> and <code>lme_contrast</code>, and
+summarised in <code>lme_err</code> (named character vector, gene →
+status). Possible values:</p>
+<ul>
+<li><strong><code>"success"</code></strong> — model converged cleanly;
+all results are reliable.</li>
+<li><strong><code>"singular_fit"</code></strong> —
+<code>isSingular()</code> was <code>TRUE</code>; random effect variance
+hit its boundary (zero). Fixed effect estimates and contrasts are still
+returned and are numerically valid. Common with small N or highly
+collinear random/fixed effects. Filter downstream if desired.</li>
+<li><strong>Unexpected error string</strong> — <code>tryCatch</code>
+caught an unexpected error; rows for that gene contain NAs.</li>
+</ul>
+<p>Note: singular fits were previously treated as a hard
+<code>stop()</code> that excluded the gene entirely. They are now
+flagged and returned, giving users the choice to retain or filter.</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(result<span class="sc">$</span>lme_err)</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>non_success <span class="ot">&lt;-</span> <span class="fu">names</span>(result<span class="sc">$</span>lme_err)[result<span class="sc">$</span>lme_err <span class="sc">!=</span> <span class="st">&quot;success&quot;</span>]</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Filter to clean fits only downstream:</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>result<span class="sc">$</span>lme_contrast <span class="sc">%&gt;%</span> <span class="fu">filter</span>(model_status <span class="sc">==</span> <span class="st">&quot;success&quot;</span>)</span></code></pre></div>
+</body>
+</html>

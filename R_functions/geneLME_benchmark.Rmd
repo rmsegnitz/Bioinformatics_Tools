@@ -1,0 +1,635 @@
+---
+title: "geneLME vs kimma: Benchmarking Report"
+subtitle: "Estimate accuracy and computational efficiency"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    toc_depth: 3
+    theme: flatly
+    highlight: tango
+    code_folding: hide
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo        = TRUE,
+  message     = FALSE,
+  warning     = FALSE,
+  comment     = "#>",
+  fig.align   = "center",
+  fig.width   = 8,
+  fig.height  = 5
+)
+```
+
+---
+
+# Overview
+
+This report benchmarks `geneLME()` against `kimma::kmFit()`, a published package for
+per-gene linear mixed effects modelling of RNA-seq data. Both functions use the same
+underlying engines (`lme4` for model fitting, `emmeans` for contrast estimation), so
+they should produce statistically identical results — but differ in contrast specification
+philosophy and computational efficiency.
+
+**Three questions addressed:**
+
+1. **Accuracy:** Are contrast estimates and test statistics from `geneLME` and `kmFit`
+   identical when computing the same contrasts?
+2. **Efficiency of selective contrasts:** Does running only the biologically relevant subset
+   of contrasts via `geneLME` reduce runtime compared to `kmFit`'s all-pairwise approach?
+3. **Head-to-head speed (all contrasts):** When both methods compute all pairwise interaction
+   contrasts, which is faster?
+
+**Key design difference:**
+
+| Feature | `geneLME` | `kmFit` |
+|---|---|---|
+| Contrast specification | User-defined subset via `contrast_spec` | All pairwise automatically |
+| Singular fit handling | Treated as error → NA | Estimates returned (no check) |
+| Parallelisation | `future_lapply` (multisession) | Native parallel via `processors` |
+| Second-order contrasts | Supported | Not supported |
+| FDR adjustment | Within-term / within-contrast grouping | BH across all genes per variable |
+
+---
+
+# Setup
+
+```{r libs}
+library(lme4)
+library(emmeans)
+library(car)
+library(broom.mixed)
+library(dplyr)
+library(tibble)
+library(purrr)
+library(future)
+library(future.apply)
+library(kimma)
+library(microbenchmark)
+library(ggplot2)
+library(tidyr)
+library(scales)
+
+source("geneLME_dev.R")
+```
+
+---
+
+# Mock Data (2,000 genes)
+
+The benchmark uses a simulated dataset matching a realistic paired longitudinal RNA-seq
+design: **10 patients × 3 treatments × 4 visits = 120 samples, 2,000 genes**.
+
+Genes 1–100 have a simulated `TrtC:V3` upregulation of +2.5 log2 units to provide a
+detectable interaction signal. A patient-level random effect is added to all genes.
+
+```{r mock-data}
+set.seed(42)
+
+n_patients  <- 10
+treatments  <- c("TrtA", "TrtB", "TrtC")
+visits      <- c("V1", "V2", "V3", "V4")
+n_genes     <- 2000
+n_signal    <- 100   # genes with simulated TrtC:V3 effect
+
+# Patient-level covariates
+patient_meta <- data.frame(
+  ptID = paste0("pt", sprintf("%02d", 1:n_patients)),
+  sex  = factor(sample(c("M", "F"), n_patients, replace = TRUE)),
+  age  = round(rnorm(n_patients, mean = 38, sd = 10)),
+  stringsAsFactors = FALSE
+)
+
+# Sample metadata (targets) — includes libID for kimma compatibility
+targets <- expand.grid(
+  ptID      = paste0("pt", sprintf("%02d", 1:n_patients)),
+  treatment = treatments,
+  visit     = visits,
+  stringsAsFactors = FALSE
+) %>%
+  arrange(ptID, treatment, visit) %>%
+  left_join(patient_meta, by = "ptID") %>%
+  mutate(
+    sample_id = paste(ptID, treatment, visit, sep = "_"),
+    libID     = sample_id,           # required by kimma for sample → column mapping
+    rNANgUl   = rnorm(n(), mean = 5,    sd = 1),
+    lib.size  = round(rnorm(n(), mean = 20e6, sd = 3e6)),
+    norm.factors = rnorm(n(), mean = 1, sd = 0.05)
+  )
+rownames(targets) <- targets$sample_id
+
+n_samples <- nrow(targets)
+
+# Expression matrix
+E_mat <- matrix(
+  rnorm(n_genes * n_samples, mean = 8, sd = 2),
+  nrow = n_genes, ncol = n_samples,
+  dimnames = list(
+    paste0("gene", sprintf("%04d", 1:n_genes)),
+    targets$sample_id
+  )
+)
+
+# Simulated TrtC:V3 effect on signal genes
+trtC_v3 <- which(targets$treatment == "TrtC" & targets$visit == "V3")
+E_mat[1:n_signal, trtC_v3] <- E_mat[1:n_signal, trtC_v3] + 2.5
+
+# Patient random effect
+for (pt in unique(targets$ptID)) {
+  idx <- which(targets$ptID == pt)
+  E_mat[, idx] <- E_mat[, idx] + rnorm(1, 0, 1)
+}
+
+# Voom-like precision weights
+W_mat <- matrix(
+  abs(rnorm(n_genes * n_samples, mean = 1, sd = 0.1)),
+  nrow = n_genes, ncol = n_samples,
+  dimnames = dimnames(E_mat)
+)
+
+# Full 2000-gene dataset (used for benchmarking)
+dat_bench <- list(E = E_mat, weights = W_mat, targets = targets)
+
+# 50-gene subset (used for accuracy comparison — faster repeated runs)
+dat_50 <- list(
+  E       = E_mat[1:50, ],
+  weights = W_mat[1:50, ],
+  targets = targets
+)
+
+cat("Design:", n_patients, "patients ×", length(treatments), "treatments ×",
+    length(visits), "visits =", n_samples, "samples\n")
+cat("Full dataset:", n_genes, "genes\n")
+cat("Accuracy subset:", nrow(dat_50$E), "genes\n")
+cat("Signal genes (TrtC:V3 +2.5 log2):", n_signal, "\n")
+```
+
+---
+
+# Contrast Specification
+
+## All pairwise interaction contrasts (66 total)
+
+`kmFit` always computes all pairwise contrasts when given `contrast_var = "treatment:visit"`.
+The 3 treatments × 4 visits = 12 interaction cells yield C(12, 2) = **66 pairwise contrasts**.
+
+`geneLME` uses an explicit `contrast_spec` data frame. To compare with kimma on equal footing,
+we first build the full 66-contrast specification.
+
+```{r contrast-spec-full}
+spec_full <- geneLME_contrast_spec(
+  targets       = dat_bench$targets,
+  contrast_vars = "treatment:visit"
+)
+
+cat("Full pairwise spec: ", nrow(spec_full), "contrasts\n")
+```
+
+## Selective contrast subsets
+
+For the efficiency demonstration, we also define two biologically focused subsets:
+
+```{r contrast-spec-subsets}
+# Subset A: between-treatment comparisons within the same visit (V2 and V3 only)
+spec_6 <- spec_full %>%
+  filter(
+    sub(".* ", "", contrast_ref) == sub(".* ", "", contrast_lvl),   # same visit
+    sub(".* ", "", contrast_ref) %in% c("V2", "V3")                # V2 and V3
+  )
+
+# Subset B: longitudinal (V2→V3) within the same treatment
+spec_3 <- spec_full %>%
+  filter(
+    sub(" .*", "", contrast_ref) == sub(" .*", "", contrast_lvl),   # same treatment
+    sub(".* ", "", contrast_ref) == "V2",
+    sub(".* ", "", contrast_lvl) == "V3"
+  )
+
+cat("Subset A (between-treatment, V2 & V3):", nrow(spec_6), "contrasts\n")
+cat("Subset B (longitudinal V2→V3, same treatment):", nrow(spec_3), "contrasts\n")
+cat("Full set (all pairwise):", nrow(spec_full), "contrasts\n")
+
+knitr::kable(
+  data.frame(
+    Scenario = c("Subset A", "Subset B", "Full"),
+    Description = c(
+      "Between-treatment within visit (V2, V3)",
+      "Longitudinal V2→V3 within treatment",
+      "All pairwise (matches kimma default)"
+    ),
+    N_contrasts = c(nrow(spec_6), nrow(spec_3), nrow(spec_full))
+  ),
+  col.names = c("Scenario", "Description", "N contrasts"),
+  caption = "Contrast subsets used in benchmarks"
+)
+```
+
+---
+
+# 1. Accuracy Comparison
+
+Both methods run on the **50-gene subset** with the **full 66 pairwise contrasts**,
+ensuring they compute exactly the same comparisons.
+
+> **Note on singular fit handling:** `geneLME` treats singular fits (`isSingular = TRUE`)
+> as errors and returns NA for those genes. `kmFit` does not perform this check and returns
+> estimates regardless. Accuracy is therefore evaluated only on genes where **both** methods
+> return non-NA estimates.
+
+## Run both methods (50 genes, all 66 contrasts)
+
+```{r accuracy-run, cache=TRUE}
+# geneLME — full 66-contrast spec
+res_geneLME_50 <- geneLME(
+  dat           = dat_50,
+  formula_str   = "~ treatment * visit + age + sex + rNANgUl + (1|ptID)",
+  model_weights = TRUE,
+  run_contrast  = TRUE,
+  contrast_vars = "treatment:visit",
+  contrast_spec = spec_full,
+  n_cores       = 8
+)
+
+# kimma — full pairwise (equivalent to all 66 contrasts)
+res_kimma_50 <- suppressMessages(
+  kmFit(
+    dat          = dat_50,
+    run_lme      = TRUE,
+    use_weights  = TRUE,
+    model        = "~ treatment * visit + age + sex + rNANgUl + (1|ptID)",
+    run_contrast = TRUE,
+    contrast_var = "treatment:visit",
+    patientID    = "ptID",
+    libraryID    = "libID",
+    processors   = 8
+  )
+)
+
+cat("geneLME: ", sum(res_geneLME_50$lme_err == "success"), "/ 50 genes succeeded\n")
+cat("kimma:   ", length(unique(res_kimma_50$lme.contrast$gene)), "/ 50 genes in contrast output\n")
+```
+
+## Result alignment
+
+```{r accuracy-join}
+# Standardise geneLME columns
+glme <- res_geneLME_50$lme_contrast %>%
+  filter(contrast_order == "first_order", !is.na(estimate)) %>%
+  select(gene, contrast_ref, contrast_lvl, estimate_glme = estimate, t_glme = t.ratio,
+         p_glme = p.value)
+
+# Standardise kimma columns
+# kimma contrast direction: estimate = lvl - ref (positive = lvl > ref)
+# same convention as geneLME
+km <- res_kimma_50$lme.contrast %>%
+  select(gene, contrast_ref, contrast_lvl, estimate_kimma = estimate,
+         t_kimma = statistic, p_kimma = pval)
+
+# Join on gene + ref/lvl pair (both methods use the same "ref - lvl" convention)
+joined <- inner_join(glme, km, by = c("gene", "contrast_ref", "contrast_lvl"))
+
+cat("Matched rows (gene × contrast, both methods non-NA):", nrow(joined), "\n")
+cat("Unique genes in comparison:", length(unique(joined$gene)), "\n")
+cat("Unique contrasts per gene:", nrow(joined) / length(unique(joined$gene)), "\n")
+```
+
+## Estimate correlation
+
+```{r accuracy-scatter-estimate, fig.height=5, fig.width=8}
+cor_est <- cor(joined$estimate_glme, joined$estimate_kimma, use = "complete.obs")
+mad_est <- mean(abs(joined$estimate_glme - joined$estimate_kimma), na.rm = TRUE)
+
+ggplot(joined, aes(x = estimate_glme, y = estimate_kimma)) +
+  geom_point(alpha = 0.15, size = 0.8, colour = "#2c7bb6") +
+  geom_abline(slope = 1, intercept = 0, colour = "firebrick", linewidth = 0.8, linetype = "dashed") +
+  annotate("text", x = -Inf, y = Inf, hjust = -0.1, vjust = 1.4,
+           label = sprintf("r = %.6f\nMAD = %.2e", cor_est, mad_est),
+           size = 4, family = "mono") +
+  labs(
+    title    = "Contrast estimates: geneLME vs kimma",
+    subtitle = sprintf("50 genes × 66 contrasts  |  n = %d matched pairs", nrow(joined)),
+    x        = "geneLME estimate",
+    y        = "kimma estimate"
+  ) +
+  theme_bw(base_size = 12)
+```
+
+## t-statistic correlation
+
+```{r accuracy-scatter-t, fig.height=5, fig.width=8}
+cor_t <- cor(joined$t_glme, joined$t_kimma, use = "complete.obs")
+mad_t <- mean(abs(joined$t_glme - joined$t_kimma), na.rm = TRUE)
+
+ggplot(joined, aes(x = t_glme, y = t_kimma)) +
+  geom_point(alpha = 0.15, size = 0.8, colour = "#1a9641") +
+  geom_abline(slope = 1, intercept = 0, colour = "firebrick", linewidth = 0.8, linetype = "dashed") +
+  annotate("text", x = -Inf, y = Inf, hjust = -0.1, vjust = 1.4,
+           label = sprintf("r = %.6f\nMAD = %.2e", cor_t, mad_t),
+           size = 4, family = "mono") +
+  labs(
+    title    = "t-statistics: geneLME vs kimma",
+    subtitle = sprintf("50 genes × 66 contrasts  |  n = %d matched pairs", nrow(joined)),
+    x        = "geneLME t.ratio",
+    y        = "kimma statistic"
+  ) +
+  theme_bw(base_size = 12)
+```
+
+## Accuracy summary
+
+```{r accuracy-summary}
+# Any divergent pairs (|estimate difference| > 0.01)?
+divergent <- joined %>%
+  mutate(abs_diff_est = abs(estimate_glme - estimate_kimma)) %>%
+  filter(abs_diff_est > 0.01) %>%
+  arrange(desc(abs_diff_est))
+
+knitr::kable(
+  data.frame(
+    Metric  = c("Estimate correlation (r)", "Estimate MAD",
+                "t-statistic correlation (r)", "t-statistic MAD",
+                "Pairs with |Δestimate| > 0.01"),
+    Value   = c(sprintf("%.8f", cor_est), sprintf("%.2e", mad_est),
+                sprintf("%.8f", cor_t),   sprintf("%.2e", mad_t),
+                nrow(divergent))
+  ),
+  col.names = c("Metric", "Value"),
+  caption   = "Accuracy summary: geneLME vs kimma (50 genes, 66 contrasts each)"
+)
+```
+
+```{r accuracy-divergent, eval=nrow(divergent) > 0}
+cat("Divergent contrast pairs (|Δestimate| > 0.01):\n")
+print(divergent %>% select(gene, contrast_ref, contrast_lvl,
+                            estimate_glme, estimate_kimma, abs_diff_est) %>% head(20))
+```
+
+> **Interpretation:** Both methods use `lme4::lmer()` for model fitting and `emmeans::contrast()`
+> for marginal means — identical numerical results are expected for genes where both methods
+> converge. Any small residual differences reflect floating-point precision only.
+> Genes absent from geneLME output were flagged as singular fits (`isSingular = TRUE`);
+> kimma returns estimates for these regardless.
+
+---
+
+# 2. Speed: Selective vs Full Contrasts
+
+`geneLME` allows users to specify only the contrasts of biological interest. Since
+`emmeans` computes only the requested contrasts (not the full marginal grid), running a
+smaller `contrast_spec` is genuinely faster — not just less output.
+
+`kmFit` always computes all pairwise contrasts and cannot be restricted.
+
+```{r bench-selective, cache=TRUE}
+cat("Running microbenchmark: selective vs full contrasts (2,000 genes, 5 reps each)...\n")
+cat("This will take several minutes.\n")
+
+mb_selective <- microbenchmark(
+  geneLME_3contrast = {
+    geneLME(
+      dat           = dat_bench,
+      formula_str   = "~ treatment * visit + age + sex + rNANgUl + (1|ptID)",
+      model_weights = TRUE,
+      run_contrast  = TRUE,
+      contrast_vars = "treatment:visit",
+      contrast_spec = spec_3,
+      n_cores       = 8
+    )
+  },
+  geneLME_6contrast = {
+    geneLME(
+      dat           = dat_bench,
+      formula_str   = "~ treatment * visit + age + sex + rNANgUl + (1|ptID)",
+      model_weights = TRUE,
+      run_contrast  = TRUE,
+      contrast_vars = "treatment:visit",
+      contrast_spec = spec_6,
+      n_cores       = 8
+    )
+  },
+  geneLME_66contrast = {
+    geneLME(
+      dat           = dat_bench,
+      formula_str   = "~ treatment * visit + age + sex + rNANgUl + (1|ptID)",
+      model_weights = TRUE,
+      run_contrast  = TRUE,
+      contrast_vars = "treatment:visit",
+      contrast_spec = spec_full,
+      n_cores       = 8
+    )
+  },
+  kimma_66contrast = {
+    suppressMessages(kmFit(
+      dat          = dat_bench,
+      run_lme      = TRUE,
+      use_weights  = TRUE,
+      model        = "~ treatment * visit + age + sex + rNANgUl + (1|ptID)",
+      run_contrast = TRUE,
+      contrast_var = "treatment:visit",
+      patientID    = "ptID",
+      libraryID    = "libID",
+      processors   = 8
+    ))
+  },
+  times = 5,
+  unit  = "sec"
+)
+
+print(mb_selective)
+```
+
+```{r bench-selective-plot, fig.height=5, fig.width=8}
+# Summary table
+bench_summary <- summary(mb_selective) %>%
+  as.data.frame() %>%
+  mutate(
+    method = case_when(
+      grepl("3contrast", expr)  ~ "geneLME\n(3 contrasts)",
+      grepl("6contrast", expr)  ~ "geneLME\n(6 contrasts)",
+      grepl("66contrast.*geneLME", expr) ~ "geneLME\n(66 contrasts)",
+      TRUE                      ~ "kimma\n(66 contrasts)"
+    ),
+    n_contrasts = c(3, 6, 66, 66),
+    package = ifelse(grepl("kimma", expr), "kimma", "geneLME")
+  )
+
+ggplot(bench_summary, aes(x = reorder(method, median), y = median,
+                           fill = package, colour = package)) +
+  geom_col(alpha = 0.75, width = 0.6) +
+  geom_errorbar(aes(ymin = lq, ymax = uq), width = 0.2, linewidth = 0.7) +
+  scale_fill_manual(values  = c("geneLME" = "#2c7bb6", "kimma" = "#d7191c")) +
+  scale_colour_manual(values = c("geneLME" = "#2c7bb6", "kimma" = "#d7191c")) +
+  labs(
+    title    = "Runtime: selective vs full contrasts (2,000 genes, 5 reps)",
+    subtitle = "Error bars = lower and upper quartile across 5 runs",
+    x        = NULL,
+    y        = "Median runtime (seconds)",
+    fill     = "Method", colour = "Method"
+  ) +
+  theme_bw(base_size = 12) +
+  theme(legend.position = "none",
+        panel.grid.major.x = element_blank())
+```
+
+```{r bench-selective-table}
+knitr::kable(
+  bench_summary %>%
+    mutate(across(c(min, lq, median, mean, uq, max), ~ round(., 1))) %>%
+    select(Scenario = method, N_contrasts = n_contrasts,
+           Min = min, Q1 = lq, Median = median, Mean = mean, Q3 = uq, Max = max),
+  caption = "Runtime summary (seconds) — selective vs full contrasts, 2,000 genes, 5 repetitions"
+)
+```
+
+```{r bench-selective-scaling, fig.height=4, fig.width=7}
+# Scaling plot: n contrasts vs time for geneLME
+glme_scaling <- bench_summary %>%
+  filter(package == "geneLME") %>%
+  mutate(n_contrasts = c(3, 6, 66))
+
+ggplot(glme_scaling, aes(x = n_contrasts, y = median)) +
+  geom_point(size = 3, colour = "#2c7bb6") +
+  geom_line(colour = "#2c7bb6", linewidth = 0.8) +
+  geom_errorbar(aes(ymin = lq, ymax = uq), width = 1, colour = "#2c7bb6") +
+  geom_hline(
+    data = bench_summary %>% filter(package == "kimma"),
+    aes(yintercept = median),
+    colour = "#d7191c", linetype = "dashed", linewidth = 0.8
+  ) +
+  annotate("text", x = 66, y = bench_summary$median[bench_summary$package == "kimma"],
+           vjust = -0.7, hjust = 1, colour = "#d7191c", size = 3.5,
+           label = "kimma (66 contrasts)") +
+  scale_x_continuous(breaks = c(3, 6, 66)) +
+  labs(
+    title    = "geneLME runtime scales with number of contrasts",
+    subtitle = "Dashed red line = kimma running the equivalent 66 contrasts",
+    x        = "Number of contrasts specified",
+    y        = "Median runtime (seconds)"
+  ) +
+  theme_bw(base_size = 12)
+```
+
+---
+
+# 3. Head-to-Head: geneLME vs kimma (all 66 contrasts)
+
+When both methods compute the same 66 pairwise contrasts on the full 2,000-gene dataset,
+this section directly compares their runtimes.
+
+> **Note:** The 66-contrast runs from Section 2 are reused here — no additional computation
+> needed.
+
+```{r bench-headtohead}
+# Extract the two relevant scenarios from mb_selective
+hth <- bench_summary %>%
+  filter(n_contrasts == 66) %>%
+  mutate(method_label = c("geneLME", "kimma"))
+
+speedup <- hth$median[hth$method_label == "kimma"] /
+           hth$median[hth$method_label == "geneLME"]
+
+knitr::kable(
+  hth %>%
+    mutate(across(c(min, lq, median, mean, uq, max), ~ round(., 1))) %>%
+    select(Method = method_label, Min = min, Q1 = lq,
+           Median = median, Mean = mean, Q3 = uq, Max = max),
+  caption = "Head-to-head runtime (seconds) — 66 pairwise contrasts, 2,000 genes, 5 repetitions"
+)
+```
+
+```{r bench-headtohead-plot, fig.height=4, fig.width=6}
+ggplot(hth, aes(x = method_label, y = median,
+                fill = method_label, colour = method_label)) +
+  geom_col(alpha = 0.75, width = 0.5) +
+  geom_errorbar(aes(ymin = lq, ymax = uq), width = 0.15, linewidth = 0.8) +
+  scale_fill_manual(values   = c("geneLME" = "#2c7bb6", "kimma" = "#d7191c")) +
+  scale_colour_manual(values = c("geneLME" = "#2c7bb6", "kimma" = "#d7191c")) +
+  labs(
+    title    = "Head-to-head: geneLME vs kimma (66 contrasts, 2,000 genes)",
+    subtitle = sprintf("Speedup ratio (kimma / geneLME): %.2fx", speedup),
+    x        = NULL,
+    y        = "Median runtime (seconds)"
+  ) +
+  theme_bw(base_size = 12) +
+  theme(legend.position = "none",
+        panel.grid.major.x = element_blank())
+```
+
+---
+
+# Summary
+
+```{r summary-table}
+knitr::kable(
+  bench_summary %>%
+    mutate(
+      Method = method,
+      `N contrasts` = n_contrasts,
+      `Median (s)` = round(median, 1),
+      `Relative to kimma` = paste0(round(bench_summary$median[bench_summary$package == "kimma"][1] / median, 2), "×")
+    ) %>%
+    select(Method, `N contrasts`, `Median (s)`, `Relative to kimma`),
+  caption = "Benchmark summary: all scenarios vs kimma baseline (2,000 genes, 5 reps)"
+)
+```
+
+## Key findings
+
+```{r key-findings}
+glme_66_med  <- bench_summary$median[grepl("66.*geneLME|geneLME.*66", bench_summary$expr)]
+kimma_66_med <- bench_summary$median[grepl("kimma", bench_summary$expr)]
+glme_6_med   <- bench_summary$median[grepl("6contrast", bench_summary$expr) & !grepl("66", bench_summary$expr)]
+glme_3_med   <- bench_summary$median[grepl("3contrast", bench_summary$expr)]
+
+cat(sprintf(
+"1. ACCURACY
+   Contrast estimates: r = %.8f, MAD = %.2e
+   t-statistics:       r = %.8f, MAD = %.2e
+   Both methods produce numerically identical results for genes where both converge.
+   Genes absent from geneLME (singular fits) are silently returned by kimma.
+
+2. EFFICIENCY OF SELECTIVE CONTRASTS
+   geneLME (3 contrasts):  %.1f s
+   geneLME (6 contrasts):  %.1f s
+   geneLME (66 contrasts): %.1f s
+   kimma   (66 contrasts): %.1f s
+   Running 6 instead of 66 contrasts in geneLME saves ~%.0f%% of runtime.
+   kimma cannot be restricted to a subset and always runs all 66 contrasts.
+
+3. HEAD-TO-HEAD (66 contrasts, 2,000 genes)
+   geneLME: %.1f s median
+   kimma:   %.1f s median
+   Speed ratio: %.2fx %s",
+  cor_est, mad_est,
+  cor_t,   mad_t,
+  glme_3_med, glme_6_med, glme_66_med, kimma_66_med,
+  (1 - glme_6_med / kimma_66_med) * 100,
+  glme_66_med, kimma_66_med, speedup,
+  ifelse(speedup > 1, "(geneLME faster)", "(kimma faster)")
+))
+```
+
+## Method comparison
+
+| Dimension | geneLME | kimma |
+|---|---|---|
+| **Estimates** | Identical to kimma (both use `lme4` + `emmeans`) | Reference |
+| **Contrast flexibility** | Any user-defined subset or custom vectors | All pairwise only |
+| **Second-order contrasts** | Supported (contrasts-of-contrasts) | Not supported |
+| **Singular fit handling** | Error — gene excluded, NA rows returned | Silent — estimates returned regardless |
+| **Scalability** | Sub-linear with fewer contrasts | Fixed cost (always all pairwise) |
+| **FDR grouping** | Within term / contrast label | BH across all genes per variable |
+
+---
+
+# Session Info
+
+```{r session-info}
+sessionInfo()
+```

@@ -1,27 +1,7 @@
 
 ########################################################
 # Scalable custom gene LMEs with contrast specification
-########################################################
-# Merged from geneLME_dev.R (2026-02-20):
-#   - Added geneLME_contrast_spec() helper
-#   - Added Branch A: interaction contrast support via contrast_spec
-#   - Added FDR adjustment (fdr_method argument)
-#   - Added $contrast_spec in return value
-#   - Soft-fail on wrong-length contrasts_secondary
-#   - Added contrast_ref / contrast_lvl columns to lme_contrast output
-#
-# Merged from geneLME_dev2.R (2026-02-20):
-#   - Singular fit → model_status flag ("singular_fit") instead of error.
-#     Results returned for all genes; filter downstream on model_status.
-#     model_status column now present in both lme_anova and lme_contrast.
-#   - New geneLME_build_contrast_args() helper: pre-computes Branch A
-#     contrasts_list and spec_lookup once before parallel dispatch,
-#     eliminating nrow(contrast_spec) × n_genes per-gene rebuilds.
-#   - geneLME_fit() signature: contrast_spec replaced by contrasts_list
-#     and spec_lookup (Branch A). geneLME_dispatch() updated accordingly.
-#   - Benchmarked (geneLME_benchmark2.html): dev2 estimates identical to
-#     previous stable (r=1.0, MAD=0); ~1.1-1.2x faster; 100% direction
-#     agreement with kimma; equal speed to kimma at 66 contrasts.
+# DEV version — adds interaction contrast support
 ########################################################
 
 
@@ -163,85 +143,10 @@ geneLME_contrast_spec <- function(targets, contrast_vars) {
 
 
 ########################################################
-# geneLME_build_contrast_args
-# Pre-computes Branch A contrast structures once, before parallel dispatch.
-#
-# Called by geneLME() when contrast_vars contains ":".
-# Returns a list with two elements that are passed directly to workers:
-#
-#   $contrasts_list — named list of contrast vectors, one per row of
-#     contrast_spec. Each vector has length == number of interaction cells,
-#     named by emmeans level string ("TrtA V1", "TrtB V2", ...).
-#     contrast_ref cell receives -1; contrast_lvl cell receives +1.
-#     Name of each vector is "contrast_lvl - contrast_ref" — the string
-#     emmeans will use as the 'contrast' column in its output.
-#
-#   $spec_lookup — data.frame(contrast, contrast_ref, contrast_lvl) for
-#     joining ref/lvl back onto the emmeans first-order result by contrast
-#     name. Avoids reconstructing this inside every geneLME_fit() call.
-#
-# The emmeans level ordering is derived from factor levels in targets (the
-# same source emmeans uses internally), guaranteeing index alignment without
-# requiring a fitted model object.
-########################################################
-
-geneLME_build_contrast_args <- function(targets, contrast_vars, contrast_spec) {
-
-  vars  <- strsplit(contrast_vars, ":")[[1]]
-  var_a <- vars[1]
-  var_b <- vars[2]
-
-  # Reproduce the exact factor-level ordering that emmeans will use.
-  # emmeans builds its reference grid from the factor levels of the model
-  # data (targets); using the same coercion logic as geneLME_contrast_spec()
-  # guarantees the level strings here match those emmeans returns.
-  fac_a <- if (is.factor(targets[[var_a]])) targets[[var_a]] else factor(targets[[var_a]], levels = sort(unique(targets[[var_a]])))
-  fac_b <- if (is.factor(targets[[var_b]])) targets[[var_b]] else factor(targets[[var_b]], levels = sort(unique(targets[[var_b]])))
-
-  # Build interaction level strings: "var_a_level var_b_level" in emmeans order.
-  # emmeans varies the rightmost variable fastest, matching interaction() default.
-  lvls_a    <- levels(fac_a)
-  lvls_b    <- levels(fac_b)
-  emm_lvls  <- as.vector(outer(lvls_a, lvls_b, paste))   # row = var_a, col = var_b
-
-  # Template zero vector, one element per interaction cell
-  default_vec        <- rep(0, length(emm_lvls))
-  names(default_vec) <- emm_lvls
-
-  # Build contrasts_list once — identical for all genes
-  contrasts_list <- list()
-  for (k in seq_len(nrow(contrast_spec))) {
-    cv <- default_vec
-    cv[contrast_spec$contrast_ref[k]] <- -1
-    cv[contrast_spec$contrast_lvl[k]] <-  1
-    contrast_name <- paste(contrast_spec$contrast_lvl[k],
-                           contrast_spec$contrast_ref[k], sep = " - ")
-    contrasts_list[[contrast_name]] <- cv
-  }
-
-  # Build spec_lookup once — identical for all genes
-  spec_lookup <- data.frame(
-    contrast     = paste(contrast_spec$contrast_lvl,
-                         contrast_spec$contrast_ref, sep = " - "),
-    contrast_ref = contrast_spec$contrast_ref,
-    contrast_lvl = contrast_spec$contrast_lvl,
-    stringsAsFactors = FALSE
-  )
-
-  list(contrasts_list = contrasts_list, spec_lookup = spec_lookup)
-}
-
-
-########################################################
 # geneLME_fit
 # Core per-gene fitting function. Called inside future_lapply.
 # Receives only the minimal pre-extracted data needed for one gene,
 # not the full EList object.
-#
-# Singular fit is no longer an error; model_status = "singular_fit"
-# is recorded and results are returned for user-side filtering.
-# Branch A receives pre-computed contrasts_list + spec_lookup instead
-# of contrast_spec. The per-gene contrast vector loop is eliminated.
 ########################################################
 
 geneLME_fit <-
@@ -253,22 +158,9 @@ geneLME_fit <-
            run_contrast,
            contrast_vars,
            contrast_var_2_levels,
-           contrasts_list,         # Branch A: pre-computed named contrast vector list, or NULL
-           spec_lookup,            # Branch A: pre-computed ref/lvl join table, or NULL
-           contrasts_primary,      # Branch B: named list of contrast vectors, or NULL
-           contrasts_secondary) {  # both branches: second-order contrast vectors, or NULL
-
-    # Load worker-side packages quietly.
-    # suppressPackageStartupMessages: silences "Loading required package: Matrix" etc.
-    # suppressWarnings: silences "package 'lme4' was built under R version X.Y.Z".
-    suppressPackageStartupMessages(suppressWarnings({
-      library(lme4)
-      library(emmeans)
-      library(car)
-      library(broom.mixed)
-      library(dplyr)
-      library(tibble)
-    }))
+           contrast_spec,          # data.frame (contrast_ref / contrast_lvl) or NULL
+           contrasts_primary,
+           contrasts_secondary) {
 
     result <- tryCatch({
 
@@ -283,22 +175,22 @@ geneLME_fit <-
       formula_obj <- as.formula(paste("expression", formula_str))
 
       # --- FIT MODEL ---
-      # check.scaleX = "ignore": silences the "predictor variables on very
-      # different scales" warning. This is expected with mixed RNA-seq covariates
-      # (e.g. lib.size vs binary treatment indicator) and does not affect model fit.
-      lme_ctrl <- lmerControl(calc.derivs = FALSE, check.scaleX = "ignore")
       if (is.null(weight_vec)) {
-        lme_i <- lmer(formula_obj, data = model_data, control = lme_ctrl)
+        lme_i <- lmer(
+          formula_obj,
+          data    = model_data,
+          control = lmerControl(calc.derivs = FALSE)
+        )
       } else {
-        lme_i <- lmer(formula_obj, weights = weight_vec, data = model_data, control = lme_ctrl)
+        lme_i <- lmer(
+          formula_obj,
+          weights = weight_vec,
+          data    = model_data,
+          control = lmerControl(calc.derivs = FALSE)
+        )
       }
 
-      # --- SINGULAR FIT: flag, do not stop ---
-      # isSingular() indicates the random effect variance hit its boundary (zero).
-      # Fixed effect estimates and contrasts are still numerically valid; the user
-      # should decide whether to retain or filter these genes downstream.
-      # model_status records the flag; "success" indicates a clean fit.
-      model_status <- if (isSingular(lme_i)) "singular_fit" else "success"
+      if (isSingular(lme_i)) stop("Boundary (singular) fit")
 
       # --- EXTRACT: AIC ---
       aic_res <- data.frame(gene = gene_name, AIC = AIC(lme_i))
@@ -314,7 +206,7 @@ geneLME_fit <-
         rowwise() %>%
         mutate(
           gene         = gene_name,
-          model_status = model_status,   # "success" or "singular_fit"
+          model_status = "success",
           predictor_class = case_when(
             grepl(":", term)                                                             ~ "interaction",
             is.numeric(model_data[[term]])                                              ~ "continuous",
@@ -355,20 +247,72 @@ geneLME_fit <-
 
         if (is_interaction) {
 
-          # ---- BRANCH A: Interaction contrast via pre-computed contrasts_list ----
-          # contrasts_list and spec_lookup were built once in geneLME() before
-          # parallel dispatch — no per-gene reconstruction needed here.
+          # ---- BRANCH A: Interaction contrast via explicit contrast_spec ----
+          # contrast_vars is a single "var_a:var_b" string; contrast_spec is always
+          # provided (enforced by geneLME() validation).
           vars  <- strsplit(contrast_vars, ":")[[1]]
           var_a <- vars[1]
           var_b <- vars[2]
 
+          # Compute EMM object first so we can extract level ordering directly from
+          # emmeans — this guarantees contrast vector indices align with what emmeans
+          # uses internally.
           emm_obj <- emmeans(
             lme_i,
             spec = as.formula(paste("~", var_a, "*", var_b)),
             data = model_data
           )
 
+          # Extract interaction level labels in the exact order emmeans uses them.
+          emm_summ      <- as.data.frame(summary(emm_obj))
+          contrast_lvls <- paste(emm_summ[[var_a]], emm_summ[[var_b]])
+
+          default_vec        <- rep(0, length(contrast_lvls))
+          names(default_vec) <- contrast_lvls
+
+          # Validate that all spec values exist as interaction levels
+          bad_ref <- setdiff(contrast_spec$contrast_ref, contrast_lvls)
+          bad_lvl <- setdiff(contrast_spec$contrast_lvl, contrast_lvls)
+          if (length(bad_ref) > 0 || length(bad_lvl) > 0) {
+            stop(paste0(
+              "contrast_spec values not found in interaction levels of '", contrast_vars, "': ",
+              paste(c(bad_ref, bad_lvl), collapse = ", ")
+            ))
+          }
+
+          # Build named contrast vector list — one entry per row of contrast_spec.
+          # Use an empty list and assign by name so the list contains exactly
+          # nrow(contrast_spec) named non-NULL entries. (Pre-allocating with
+          # vector("list", n) and assigning by name appends rather than fills,
+          # leaving the integer-indexed slots as NULL.)
+          #
+          # Swap-tolerance: contrast_ref receives -1 and contrast_lvl receives +1.
+          # If the user has manually swapped ref/lvl in a given row (placing the
+          # "higher" level-index cell as contrast_ref), the contrast vector and its
+          # estimate are simply sign-flipped relative to the canonical direction —
+          # no error occurs and the result is statistically valid.
+          contrasts_list <- list()
+          for (k in seq_len(nrow(contrast_spec))) {
+            cv <- default_vec
+            cv[which(names(cv) == contrast_spec$contrast_ref[k])] <- -1
+            cv[which(names(cv) == contrast_spec$contrast_lvl[k])] <-  1
+            contrast_name <- paste(contrast_spec$contrast_lvl[k],
+                                   contrast_spec$contrast_ref[k], sep = " - ")
+            contrasts_list[[contrast_name]] <- cv
+          }
+
           emm_1st_A <- contrast(emm_obj, method = contrasts_list, adjust = "none")
+
+          # Build a lookup from contrast name → ref/lvl for joining onto first-order results.
+          # The contrast name is constructed as "lvl - ref" (same pattern used above when
+          # building contrasts_list), so it matches the 'contrast' column emmeans returns.
+          spec_lookup <- data.frame(
+            contrast     = paste(contrast_spec$contrast_lvl,
+                                 contrast_spec$contrast_ref, sep = " - "),
+            contrast_ref = contrast_spec$contrast_ref,
+            contrast_lvl = contrast_spec$contrast_lvl,
+            stringsAsFactors = FALSE
+          )
 
           if (!is.null(contrasts_secondary)) {
             # suppressWarnings: emmeans internally calls lmer on the first-order contrast
@@ -379,7 +323,7 @@ geneLME_fit <-
               contrast(emm_1st_A, method = contrasts_secondary, adjust = "none")
             )
             contrast_res <- bind_rows(
-              # First-order: join ref/lvl from pre-computed spec_lookup by contrast name
+              # First-order: join ref/lvl from spec_lookup by contrast name
               as.data.frame(emm_1st_A) %>%
                 mutate(contrast_order = "first_order") %>%
                 left_join(spec_lookup, by = "contrast"),
@@ -388,12 +332,12 @@ geneLME_fit <-
                 mutate(contrast_order  = "second_order",
                        contrast_ref    = NA_character_,
                        contrast_lvl    = NA_character_)
-            ) %>% mutate(gene = gene_name, model_status = model_status)
+            ) %>% mutate(gene = gene_name)
           } else {
             contrast_res <- as.data.frame(emm_1st_A) %>%
               mutate(contrast_order = "first_order") %>%
               left_join(spec_lookup, by = "contrast") %>%
-              mutate(gene = gene_name, model_status = model_status)
+              mutate(gene = gene_name)
           }
 
         } else {
@@ -425,14 +369,13 @@ geneLME_fit <-
                 mutate(contrast_order = "second_order",
                        contrast_ref   = NA_character_,
                        contrast_lvl   = NA_character_)
-            ) %>% mutate(gene = gene_name, model_status = model_status)
+            ) %>% mutate(gene = gene_name)
           } else {
             contrast_res <- as.data.frame(emm_1st) %>%
               mutate(contrast_order = "first_order",
                      contrast_ref   = NA_character_,
                      contrast_lvl   = NA_character_,
-                     gene           = gene_name,
-                     model_status   = model_status)
+                     gene           = gene_name)
           }
         }
 
@@ -444,7 +387,7 @@ geneLME_fit <-
         aic          = aic_res,
         anova        = lme_i_anova_tab,
         contrasts    = contrast_res,
-        model_status = setNames(model_status, gene_name)
+        model_status = setNames("success", gene_name)
       )
 
     }, error = function(e) {
@@ -496,8 +439,6 @@ geneLME_fit <-
 #                 the 'by' variable level (e.g. "TrtC vs TrtA, visit = V2"),
 #                 so grouping by contrast alone is sufficient.
 #   NA p-values (failed gene models) are preserved as NA in p.value_adj.
-#   singular_fit genes are included in the adjustment set (their p-values
-#   are valid; users filter on model_status if they wish to exclude them).
 ########################################################
 
 geneLME_compiler <- function(fit, fdr_method = "BH", contrast_spec = NULL) {
@@ -505,7 +446,6 @@ geneLME_compiler <- function(fit, fdr_method = "BH", contrast_spec = NULL) {
   lme_anova <- map_dfr(fit, "anova") %>%
     group_by(term) %>%
     mutate(p.value_adj = p.adjust(p.value, method = fdr_method)) %>%
-    relocate(p.value_adj, .after = p.value)%>%
     ungroup()
 
   lme_contrast_raw <- map_dfr(fit, "contrasts")
@@ -514,7 +454,6 @@ geneLME_compiler <- function(fit, fdr_method = "BH", contrast_spec = NULL) {
     lme_contrast_raw %>%
       group_by(contrast, contrast_order) %>%
       mutate(p.value_adj = p.adjust(p.value, method = fdr_method)) %>%
-      relocate(p.value_adj, .after = p.value)%>%
       ungroup()
   } else {
     lme_contrast_raw   # no contrasts run; return as-is (empty or NULL-row stub)
@@ -540,9 +479,6 @@ geneLME_compiler <- function(fit, fdr_method = "BH", contrast_spec = NULL) {
 #      no environment baggage for future to scan.
 #   2. All shared objects passed via future.globals, bypassing automatic
 #      scanning entirely.
-#
-# contrast_spec replaced by contrasts_list + spec_lookup (Branch A)
-# in both the function signature and future.globals.
 ########################################################
 
 geneLME_dispatch <- function(gene_data_list,
@@ -551,17 +487,12 @@ geneLME_dispatch <- function(gene_data_list,
                              run_contrast,
                              contrast_vars,
                              contrast_var_2_levels,
-                             contrasts_list,
-                             spec_lookup,
+                             contrast_spec,
                              contrasts_primary,
                              contrasts_secondary) {
   n_genes <- length(gene_data_list)
 
-  # Suppress "package 'X' was built under R version Y" warnings that
-  # future re-raises on the main process after collecting worker results.
-  # These are cosmetic version-mismatch notices — not actionable errors.
-  withCallingHandlers(
-    future.apply::future_lapply(
+  future_lapply(
     seq_len(n_genes),
     FUN = function(i) {
       gene_data <- gene_data_list[[i]]
@@ -574,8 +505,7 @@ geneLME_dispatch <- function(gene_data_list,
         run_contrast          = run_contrast,
         contrast_vars         = contrast_vars,
         contrast_var_2_levels = contrast_var_2_levels,
-        contrasts_list        = contrasts_list,
-        spec_lookup           = spec_lookup,
+        contrast_spec         = contrast_spec,
         contrasts_primary     = contrasts_primary,
         contrasts_secondary   = contrasts_secondary
       )
@@ -587,19 +517,14 @@ geneLME_dispatch <- function(gene_data_list,
       run_contrast          = run_contrast,
       contrast_vars         = contrast_vars,
       contrast_var_2_levels = contrast_var_2_levels,
-      contrasts_list        = contrasts_list,
-      spec_lookup           = spec_lookup,
+      contrast_spec         = contrast_spec,
       contrasts_primary     = contrasts_primary,
       contrasts_secondary   = contrasts_secondary,
       geneLME_fit           = geneLME_fit
     ),
+    future.packages = c("lme4", "emmeans", "car", "broom.mixed", "dplyr", "tibble"),
     future.seed = TRUE
-  ),
-  warning = function(w) {
-    if (grepl("was built under R version", conditionMessage(w))) {
-      invokeRestart("muffleWarning")
-    }
-  })
+  )
 }
 
 
@@ -607,9 +532,6 @@ geneLME_dispatch <- function(gene_data_list,
 # geneLME
 # User-facing wrapper: validates inputs, sets up parallel plan,
 # pre-extracts per-gene data, dispatches geneLME_fit in parallel.
-#
-# Calls geneLME_build_contrast_args() for Branch A to pre-compute
-# contrasts_list and spec_lookup before the parallel stage.
 ########################################################
 
 geneLME <-
@@ -632,10 +554,9 @@ geneLME <-
     # passed to workers. Workers reconstruct the formula from formula_str.
     formula_obj_local <- as.formula(paste("expression", formula_str))
 
-    # Initialise objects populated during the contrast validation block below.
+    # Initialise indexed_contrast_spec to NULL; populated inside the contrast
+    # validation block below (Branch A or Branch B) and passed to the compiler.
     indexed_contrast_spec <- NULL
-    contrasts_list        <- NULL   # Branch A: pre-computed named contrast vectors
-    spec_lookup           <- NULL   # Branch A: pre-computed ref/lvl join table
 
     # 1. Formula variables present in targets
     required_vars <- all.vars(formula_obj_local)
@@ -772,17 +693,6 @@ geneLME <-
         }
       }
 
-      # --- PRE-COMPUTE BRANCH A CONTRAST STRUCTURES ---
-      # Build contrasts_list and spec_lookup once here, before parallel dispatch.
-      # Workers receive these ready-made objects instead of rebuilding from
-      # contrast_spec on every gene — eliminates nrow(contrast_spec) × n_genes
-      # iterations of R-level vector construction.
-      if (is_interaction) {
-        contrast_args  <- geneLME_build_contrast_args(dat$targets, contrast_vars, contrast_spec)
-        contrasts_list <- contrast_args$contrasts_list
-        spec_lookup    <- contrast_args$spec_lookup
-      }
-
       # 3c. contrast_vars present in targets (split on ":" for interaction)
       vars_to_check <- unique(unlist(strsplit(contrast_vars, ":")))
       missing_contrast_vars <- setdiff(vars_to_check, colnames(dat$targets))
@@ -876,8 +786,8 @@ geneLME <-
 
     # --- PARALLEL PLAN ---
     workers <- if (is.null(n_cores)) max(1L, parallel::detectCores() - 4L) else n_cores
-    future::plan(future::multisession, workers = workers)
-    on.exit(future::plan(future::sequential), add = TRUE)
+    plan(multisession, workers = workers)
+    on.exit(plan(sequential), add = TRUE)
 
     # --- DISPATCH via clean-scope helper ---
     fit_results <- geneLME_dispatch(
@@ -887,8 +797,7 @@ geneLME <-
       run_contrast          = run_contrast,
       contrast_vars         = contrast_vars,
       contrast_var_2_levels = contrast_var_2_levels,
-      contrasts_list        = contrasts_list,
-      spec_lookup           = spec_lookup,
+      contrast_spec         = contrast_spec,
       contrasts_primary     = contrasts_primary,
       contrasts_secondary   = contrasts_secondary
     )
