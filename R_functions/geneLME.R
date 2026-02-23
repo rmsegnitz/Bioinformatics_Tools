@@ -2,6 +2,27 @@
 ########################################################
 # Scalable custom gene LMEs with contrast specification
 ########################################################
+
+# Author: Max Segnitz, msegnitz@uw.edu
+# Started February 2026
+#
+# © Richard M Segnitz 2026
+# License: This software is licensed under GNU General Public License, and may
+# be modified and/or redistributed under GNU GPL version 3 or later. License details
+# can be found in the accompanying this script, or at  (http://www.gnu.org/licenses/).
+#
+# DESCRIPTION:
+# geneLME fits linear mixed effects models at scale across a full RNA-seq expression matrix, 
+# extracting ANOVA tables and user-defined emmeans-based contrasts in parallel via the future framework. 
+# It is designed around the limma EList data structure.
+# FEATURES:
+# -True random effects fit via lme4 models scaled in parallel using (future_lapply)
+# -Supports voom precision weights (dat$weights)
+# -Extracts car::Anova() type II ANOVA tables with per-predictor coefficient estimates.
+# -Flexible user-define contrast specification including optional second-order contrasts (contrasts-of-contrasts) 
+# -Per-gene error capture: failed genes do not abort the run
+
+# RECENT DEVELOPMENT NOTES:
 # Merged from geneLME_dev.R (2026-02-20):
 #   - Added geneLME_contrast_spec() helper
 #   - Added Branch A: interaction contrast support via contrast_spec
