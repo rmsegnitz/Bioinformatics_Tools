@@ -37,3 +37,4 @@ vignettes/*.pdf
 
 # Apple file tracking
 .DS_Store
+.positai
