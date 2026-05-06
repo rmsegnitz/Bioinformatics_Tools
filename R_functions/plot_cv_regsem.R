@@ -15,7 +15,6 @@
 # feature shrinkage / exclusion.
 
 ################################################################################################################
-
 # ============================================================
 #  plot_cv_regsem()
 #  Visualize lasso regularization path from a cv_regsem() fit
@@ -37,6 +36,9 @@
 #                    derived from data.
 #    lambda_max    : numeric; upper bound of lambda range to display.
 #                    Default 0.15.
+#    exclude_nonconv: logical; if TRUE, lambda values where conv == 1
+#                    (non-convergent solutions) are excluded from all
+#                    plots. Default TRUE.
 #    lambda_min_sel: numeric; the selected/optimal lambda value,
 #                    used to draw a reference band on plots. If NULL,
 #                    no band is drawn.
@@ -62,6 +64,7 @@ plot_cv_regsem <- function(
     mediator_suffix  = "modSEM",
     z_suffix         = "_Z",
     mediator_levels  = NULL,
+    exclude_nonconv  = TRUE,
     lambda_max       = 0.15,
     lambda_min_sel   = NULL,
     band_halfwidth   = 0.0025,
@@ -81,7 +84,25 @@ plot_cv_regsem <- function(
   library(dplyr); library(tidyr); library(ggplot2)
   library(patchwork); library(stringr); library(tibble); library(readr)
   
-  # ---- 1. Extract & tidy parameter estimates ---------------------------------
+  # ---- 1. Identify non-convergent lambda values ------------------------------
+  
+  fits_df <- as.data.frame(fit_cv$fits)
+  
+  if (exclude_nonconv && "conv" %in% colnames(fits_df)) {
+    nonconv_lambdas <- fits_df$lambda[fits_df$conv == 1]
+    if (length(nonconv_lambdas) > 0) {
+      message(sprintf(
+        "plot_cv_regsem: excluding %d non-convergent solution(s) (conv == 1) at lambda = %s.",
+        length(nonconv_lambdas),
+        paste(round(nonconv_lambdas, 4), collapse = ", ")
+      ))
+    }
+    fits_df <- filter(fits_df, conv != 1)
+  }
+  
+  conv_lambdas <- fits_df$lambda
+  
+  # ---- 2. Extract & tidy parameter estimates ---------------------------------
   
   # Build path strings for the two path types we care about:
   #   (a) treatment  -> mediator  (a-paths)
@@ -150,14 +171,11 @@ plot_cv_regsem <- function(
       # Specific indirect effect = a-path × b-path
       ind_effect_coef = mediator_outcome * treatment_mediator
     ) %>%
-    left_join(
-      as.data.frame(fit_cv$fits),
-      by = "lambda"
-    ) %>%
-    mutate(
-      dBIC = BIC - min(fit_cv$fits[, "BIC"], na.rm = TRUE)
-    ) %>%
-    filter(lambda <= lambda_max)
+    left_join(fits_df, by = "lambda") %>%
+    mutate(dBIC = BIC - min(fits_df$BIC, na.rm = TRUE)) %>%
+    filter(lambda <= lambda_max) %>%
+    { if (exclude_nonconv && "conv" %in% colnames(fits_df))
+      filter(., lambda %in% conv_lambdas) else . }
   
   # ---- 4. Regularization path plot ------------------------------------------
   # Three facets: b-path, a-path, indirect effect
@@ -243,7 +261,7 @@ plot_cv_regsem <- function(
     mutate(retention = ifelse(abs(ind_effect_coef) > 0, "retained", "removed")) %>%
     group_by(lambda, retention) %>%
     reframe(n = n(), BIC = unique(BIC)) %>%
-    mutate(dBIC = BIC - min(fit_cv$fits[, "BIC"], na.rm = TRUE)) %>%
+    mutate(dBIC = BIC - min(fits_df$BIC, na.rm = TRUE)) %>%
     filter(retention == "retained")
   
   # Linear interpolation for smooth colour gradient along path
