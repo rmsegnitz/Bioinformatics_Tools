@@ -59,11 +59,21 @@ par_cv_regsem <- function(
     random.alpha  = 0.5,
     prerun        = FALSE,
     par_threshold = 20L,
-    n.cores       = parallel::detectCores() - 1
+    n.cores       = 1,
+    max.cores = 4
 ) {
   
   require(regsem)
   require(parallel)
+  
+  # ---- safety check core specification ---------------------------------------
+  if (n_cores > max_cores) {
+    warning(sprintf(
+      "Requested %d cores exceeds safe maximum of %d. Falling back to %d cores.\nNOTE: running cv_regsem uses high memory swap and parallelizing can easily exhaust memory. The max.cores argument can be altered, but this should be done with caution.",
+      n_cores, max_cores, max_cores
+    ))
+    n_cores <- max_cores
+  }
   
   # ---- build full lambda grid -----------------------------------------------
   lambda_grid <- round(
