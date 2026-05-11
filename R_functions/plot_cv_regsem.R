@@ -86,7 +86,10 @@ plot_cv_regsem <- function(
   
   # ---- 1. Identify non-convergent lambda values ------------------------------
   
-  fits_df <- as.data.frame(fit_cv$fits)
+  fits_df <- 
+    as.data.frame(fit_cv$fits)%>%
+    mutate(lambda = round(lambda, digits = 5))
+  
   
   if (exclude_nonconv && "conv" %in% colnames(fits_df)) {
     nonconv_lambdas <- fits_df$lambda[fits_df$conv == 1]
@@ -102,6 +105,9 @@ plot_cv_regsem <- function(
   
   conv_lambdas <- fits_df$lambda
   
+  # Function to count decimal places
+  lambda_jump <- signif(fit_cv$call$jump, digits = 5)
+  
   # ---- 2. Extract & tidy parameter estimates ---------------------------------
   
   # Build path strings for the two path types we care about:
@@ -111,10 +117,11 @@ plot_cv_regsem <- function(
   b_path_pattern <- paste0(z_suffix, " -> ", outcome_var)
   
   params_df <- as.data.frame(fit_cv$parameters) %>%
+    dplyr::select(contains("->")) %>%
     rownames_to_column("lambda_round") %>%
     mutate(
-      lambda = (parse_number(lambda_round) - 1) * fit_cv$call$jump
-    ) %>%
+      lambda = round(seq(from = min(fits_df$lambda), by = lambda_jump, length.out = n()),
+                     digits = 5))%>%
     pivot_longer(
       cols      = contains("->"),
       names_to  = "parameter",
@@ -126,7 +133,8 @@ plot_cv_regsem <- function(
       grepl(a_path_pattern, parameter, fixed = TRUE) |
         grepl(b_path_pattern, parameter, fixed = TRUE)
     ) %>%
-    filter(grepl(mediator_suffix, parameter, fixed = TRUE))
+    filter(grepl(mediator_suffix, parameter, fixed = TRUE))%>%
+    filter(lambda %in% fits_df$lambda)
   
   # ---- 2. Derive mediator label from parameter string -----------------------
   # a-path label lives in the RHS  ("treatment -> modSEM_X_Z" → "modSEM_X_Z")
@@ -222,6 +230,9 @@ plot_cv_regsem <- function(
     group_by(mediator) %>%
     mutate(retention_total = sum(retention == "retained")) %>%
     ungroup() %>%
+    group_by(lambda) %>%
+    mutate(n_i = sum(retention == "retained")) %>%
+    ungroup()%>%
     arrange(retention_total, mediator) %>%
     mutate(mediator = factor(mediator, levels = unique(as.character(mediator))))
   
@@ -250,7 +261,7 @@ plot_cv_regsem <- function(
       ) +
       theme_bw() +
       theme(
-        aspect.ratio = nlevels(retention_df$mediator) / (lambda_max / fit_cv$call$jump),
+        aspect.ratio = nlevels(retention_df$mediator) / (lambda_max / lambda_jump),
         panel.grid   = element_blank()
       )
   }
