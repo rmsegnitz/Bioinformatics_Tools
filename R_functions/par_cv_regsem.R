@@ -58,7 +58,7 @@ par_cv_regsem <- function(
     missing       = "listwise",
     random.alpha  = 0.5,
     prerun        = FALSE,
-    par_threshold = 20L,
+    par.threshold = 20L,
     n.cores       = 1,
     max.cores = 4
 ) {
@@ -67,12 +67,12 @@ par_cv_regsem <- function(
   require(parallel)
   
   # ---- safety check core specification ---------------------------------------
-  if (n_cores > max_cores) {
+  if (n.cores > max.cores) {
     warning(sprintf(
       "Requested %d cores exceeds safe maximum of %d. Falling back to %d cores.\nNOTE: running cv_regsem uses high memory swap and parallelizing can easily exhaust memory. The max.cores argument can be altered, but this should be done with caution.",
-      n_cores, max_cores, max_cores
+      n.cores, max.cores, max.cores
     ))
-    n_cores <- max_cores
+    n.cores <- max.cores
   }
   
   # ---- build full lambda grid -----------------------------------------------
@@ -221,7 +221,7 @@ par_cv_regsem <- function(
   
   # ---- serial fallback for small grids --------------------------------------
   .run_serial <- function(lambda_grid, worker_args, fit.ret, metric,
-                          n.lambda, par_threshold, serial_msg) {
+                          n.lambda, par.threshold, serial_msg) {
     message(serial_msg)
     pb  <- txtProgressBar(min = 0, max = length(lambda_grid), style = 3)
     res <- vector("list", length(lambda_grid))
@@ -277,11 +277,11 @@ par_cv_regsem <- function(
   # ---- dispatch: serial or parallel -----------------------------------------
   start_time <- Sys.time()
   
-  if (n.lambda < par_threshold) {
+  if (n.lambda < par.threshold) {
     raw_results <- .run_serial(
-      lambda_grid, worker_args, fit.ret, metric, n.lambda, par_threshold,
+      lambda_grid, worker_args, fit.ret, metric, n.lambda, par.threshold,
       sprintf("par_cv_regsem: n.lambda=%d is below threshold (%d), running serially.",
-              n.lambda, par_threshold)
+              n.lambda, par.threshold)
     )
   } else {
     n.cores <- min(n.cores, length(lambda_grid))
