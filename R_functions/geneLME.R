@@ -95,11 +95,12 @@ geneLME_contrast_spec <- function(targets, contrast_vars) {
     }
 
     vars  <- strsplit(contrast_vars, ":")[[1]]
+    if(length(vars)>2){stop("Greater than 2-way interaction specified. 3-way interactions (or more) not currently supported.")}
     var_a <- vars[1]
     var_b <- vars[2]
 
-    if (!var_a %in% colnames(targets)) stop(paste0("Variable '", var_a, "' not found in targets."))
-    if (!var_b %in% colnames(targets)) stop(paste0("Variable '", var_b, "' not found in targets."))
+    if (!var_a %in% colnames(targets)) stop(paste0("Variable '", var_a, "' not found in targets. Check for consistency in naming, extra blankspace etc."))
+    if (!var_b %in% colnames(targets)) stop(paste0("Variable '", var_b, "' not found in targets. Check for consistency in naming, extra blankspace etc."))
 
     # Coerce each variable to a factor, preserving any existing factor level order.
     # If the column is already a factor, levels() preserves the user-defined ordering.
@@ -107,6 +108,14 @@ geneLME_contrast_spec <- function(targets, contrast_vars) {
     # This ensures the interaction level string ordering — and therefore which member
     # of each pair lands in contrast_ref vs contrast_lvl — is fully deterministic and
     # consistent between geneLME_contrast_spec() and emmeans' internal ordering.
+    
+    if(any(is.numeric(list(targets[[var_a]], targets[[var_b]])))){
+      stop("Continuous numeric variable specified. If desired interaction is A_discrete:B_continuous, 
+            please specify levels of A,  the discrete variable, following the non-interaction call to geneLME_contrast_spec().
+            Contrasts can be specfied to calculate slopes of B, the continuous variable at specified levels of A;
+            or to calculate specified contrasts of A at specified values of B, the continuous variable.")
+    }
+    
     fac_a <- if (is.factor(targets[[var_a]])) targets[[var_a]] else factor(targets[[var_a]], levels = sort(unique(targets[[var_a]])))
     fac_b <- if (is.factor(targets[[var_b]])) targets[[var_b]] else factor(targets[[var_b]], levels = sort(unique(targets[[var_b]])))
 
@@ -148,6 +157,13 @@ geneLME_contrast_spec <- function(targets, contrast_vars) {
     missing_vars <- setdiff(contrast_vars, colnames(targets))
     if (length(missing_vars) > 0) {
       stop(paste0("Variable(s) not found in targets: ", paste(missing_vars, collapse = ", ")))
+    }
+    
+    if(any(sapply(targets[, contrast_vars], is.numeric))){
+      stop("Continuous numeric variable specified. If desired interaction is A_discrete:B_continuous, 
+            please specify levels of A,  the discrete variable, following the non-interaction call to geneLME_contrast_spec().
+            Contrasts can be specfied to calculate slopes of B, the continuous variable at specified levels of A;
+            or to calculate specified contrasts of A at specified values of B, the continuous variable.")
     }
 
     result <- lapply(seq_along(contrast_vars), function(i) {
