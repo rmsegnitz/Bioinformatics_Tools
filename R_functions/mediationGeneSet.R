@@ -185,10 +185,10 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
                         paste("(1|",random.effect , ")", sep=""), sep=" "))}}
       
       # Fit mediator model
-      med.fit<-eval(bquote(lm( med.formula, model.data)))
-      
+      med.fit <- do.call(lmer, list(formula = med.formula, data = model.data))
+     
       # Fit outcome (dependent variable) model
-      out.fit<-eval(bquote(lm(out.formula, model.data)))
+      out.fit <- do.call(lmer, list(formula = out.formula, data = model.data))
       
       # Save input model output
       mediation.model.sums[[i]][[paste(i,"mediator",sep="_")]]<-summary(med.fit)
@@ -422,10 +422,11 @@ if(!is.null(color.groups)){if("Average" %in% names(color.groups) & "Total" %in% 
       }}
       
       # Fit mediator model
-      med.fit<-eval(bquote(lm(med.formula, model.data)))
+      med.fit <- do.call(lm, list(formula = med.formula, data = model.data))
+      
       
       # Fit outcome (dependent variable) model
-      out.fit<-eval(bquote(lm(out.formula, model.data)))
+      out.fit <- do.call(lm, list(formula = out.formula, data = model.data))
       
       # Save input model output
       mediation.model.sums[[i]][[paste(i,"mediator",sep="_")]]<-summary(med.fit)
